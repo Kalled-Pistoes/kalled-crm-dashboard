@@ -1,5 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import staticPlugin from '@fastify/static';
 import XLSX from 'xlsx';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -184,8 +185,18 @@ function getMappings(wb: XLSX.WorkBook): Mappings {
 // ── Cors ──────────────────────────────────────────────────────────────────────
 fastify.register(cors, { origin: true });
 
+// ── Serve Frontend Estático ───────────────────────────────────────────────────
+const frontendDist = path.resolve(__dirname, '../frontend/dist');
+if (fs.existsSync(frontendDist)) {
+    fastify.register(staticPlugin, {
+        root: frontendDist,
+        prefix: '/',
+        decorateReply: false,
+    });
+}
+
 // ── Endpoints ─────────────────────────────────────────────────────────────────
-fastify.get('/', async () => ({ status: 'ok', message: 'CRM Backend rodando (v3)' }));
+fastify.get('/api/health', async () => ({ status: 'ok', message: 'CRM Backend rodando (v3)' }));
 
 fastify.get('/api/dashboard/stats', async (request, reply) => {
     try {
@@ -729,6 +740,18 @@ fastify.get('/api/representantes/:nome/visitas-por-cliente', async (request, rep
             .map(([cliente, d]) => ({ cliente, custo: d.custo, mes: d.ultimaVisita ? d.ultimaVisita.substring(0, 7) : '' }))
             .sort((a, b) => b.custo - a.custo);
     } catch (e: any) { reply.status(500).send({ error: e.message }); }
+});
+
+// ── SPA Fallback (React Router) ───────────────────────────────────────────────
+// Rotas não-API retornam index.html para o React Router funcionar
+fastify.setNotFoundHandler((request, reply) => {
+    if (!request.url.startsWith('/api/')) {
+        const indexPath = path.join(frontendDist, 'index.html');
+        if (fs.existsSync(indexPath)) {
+            return reply.type('text/html').send(fs.readFileSync(indexPath));
+        }
+    }
+    reply.status(404).send({ error: 'Not found' });
 });
 
 // Iniciando
