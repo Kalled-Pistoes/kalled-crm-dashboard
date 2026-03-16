@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_URL || window.location.origin;
 
 async function fetchJson<T>(path: string, params?: Record<string, string>): Promise<T> {
     const url = new URL(`${API_BASE}${path}`);
