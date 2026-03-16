@@ -94,10 +94,18 @@ function filterData(data: any[], query: any, mappings: Mappings, limitYTD: boole
     });
 }
 
-// ── Leitura do Excel ──────────────────────────────────────────────────────────
-function loadWorkbook() {
+// ── Leitura do Excel (com cache de 5 minutos) ─────────────────────────────────
+let _cachedWb: XLSX.WorkBook | null = null;
+let _cacheTime = 0;
+const CACHE_TTL = 5 * 60 * 1000;
+
+function loadWorkbook(): XLSX.WorkBook {
+    const now = Date.now();
+    if (_cachedWb && (now - _cacheTime) < CACHE_TTL) return _cachedWb;
     if (!fs.existsSync(EXCEL_PATH)) throw new Error(`Arquivo não encontrado: ${EXCEL_PATH}`);
-    return XLSX.readFile(EXCEL_PATH);
+    _cachedWb = XLSX.readFile(EXCEL_PATH);
+    _cacheTime = now;
+    return _cachedWb;
 }
 
 function getSheet<T = any>(wb: XLSX.WorkBook, sheetName: string): T[] {
@@ -757,6 +765,13 @@ fastify.setNotFoundHandler((request, reply) => {
 // Iniciando
 const start = async () => {
     try {
+        // Pré-carrega o Excel em cache antes de abrir o servidor
+        try {
+            loadWorkbook();
+            console.log('[CRM] Planilha carregada em cache');
+        } catch (e: any) {
+            console.warn('[CRM] Aviso: não foi possível pré-carregar planilha:', e.message);
+        }
         await fastify.listen({ port: 3000, host: '0.0.0.0' });
         console.log('Servidor rodando em http://localhost:3000');
     } catch (err) {
