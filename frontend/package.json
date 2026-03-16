@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "node -e \"require('fs').mkdirSync('dist/assets',{recursive:true});\"",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
