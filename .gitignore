@@ -1,0 +1,56 @@
+# Dependências
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+
+# Build
+frontend/dist/
+frontend/.vite/
+
+# Ambiente Python
+backend/__pycache__/
+backend/*.pyc
+backend/*.pyo
+backend/.venv/
+backend/venv/
+*.egg-info/
+
+# Base de dados (arquivo Excel com dados sensíveis)
+*.xlsx
+*.xls
+~$*
+
+# Variáveis de ambiente
+.env
+.env.local
+.env.production
+
+# Logs e arquivos temporários
+*.log
+npm-debug.log*
+backend/server_log*.txt
+
+# Arquivos de debug (scripts temporários)
+backend/debug_*.js
+backend/debug_*.ts
+backend/test_*.js
+
+# Banco de dados local
+backend/prisma/crm.db
+backend/prisma/*.db
+
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/settings.json
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Claude Code
+.claude/

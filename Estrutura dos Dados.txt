@@ -1,0 +1,20 @@
+1. Produtos (Código e Descrição)
+Onde você cruza o código do produto vendido com o catálogo completo.
+
+Aba Vendas, Coluna D (Código (SKU)) ↔ Aba Cross, Coluna A (PN)
+
+
+2. Clientes (Quem comprou)
+Onde você liga a venda aos dados cadastrais do cliente (desconto, prazo, etc).
+
+Aba Vendas, Coluna B (Cliente) ↔ Aba Clientes, Coluna A (Cliente)
+Aba Vendas Representantes, Coluna C (Cliente) ↔ Aba Clientes, Coluna A (Cliente)
+Aba Visitas Tecnicas, Coluna D (Cliente) ↔ Aba Clientes, Coluna A (Cliente)
+
+
+3. Representantes (Vendedores)
+Onde você liga as vendas e visitas ao vendedor responsável e suas metas.
+
+Aba Clientes, Coluna F (Representante) ↔ Aba Metas Representantes, Coluna A (Vendedor)
+Aba Vendas Representantes, Coluna B (Vendedor) ↔ Aba Metas Representantes, Coluna A (Vendedor)
+Aba Visitas Tecnicas, Coluna C (Representante) ↔ Aba Metas Representantes, Coluna A (Vendedor)

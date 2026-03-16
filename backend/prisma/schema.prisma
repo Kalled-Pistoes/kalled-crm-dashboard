@@ -1,0 +1,75 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./crm.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Venda {
+  id          Int      @id @default(autoincrement())
+  data        DateTime
+  clienteNome String
+  produtoSku  String
+  quantidade  Float
+  valor       Float
+
+  cliente     Cliente  @relation(fields: [clienteNome], references: [nome])
+  produto     Produto  @relation(fields: [produtoSku], references: [sku])
+
+  @@map("vendas")
+}
+
+model Cliente {
+  nome             String  @id
+  semCNPJ          String? // Assuming it might be "Sim"/"Não" or a code
+  desconto         String? // Could be percentage string
+  pagamento        String?
+  prazo            String?
+  representanteNome String?
+  status           String?
+
+  representante    Representante? @relation(fields: [representanteNome], references: [nome])
+  vendas           Venda[]
+  visitas          Visita[]
+
+  @@map("clientes")
+}
+
+model Produto {
+  sku         String  @id // "PN"
+  descricao   String?
+  metalLeve   String?
+  ks          String?
+  rioSulense  String?
+
+  vendas      Venda[]
+
+  @@map("produtos")
+}
+
+model Representante {
+  nome    String @id // "Vendedor"
+  estado  String?
+  meta    Float?
+
+  clientes Cliente[]
+  visitas  Visita[]
+
+  @@map("representantes")
+}
+
+model Visita {
+  id                Int      @id @default(autoincrement())
+  data              DateTime
+  tipoVisita        String?
+  representanteNome String
+  clienteNome       String?
+  custo             Float?
+
+  representante     Representante @relation(fields: [representanteNome], references: [nome])
+  cliente           Cliente?      @relation(fields: [clienteNome], references: [nome])
+
+  @@map("visitas_tecnicas")
+}
