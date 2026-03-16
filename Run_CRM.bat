@@ -43,11 +43,12 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: Abre porta 3000 no firewall para acesso pela rede
+:: Libera porta 3000 no firewall (apenas na primeira execucao - abre UAC)
 netsh advfirewall firewall show rule name="CRM Kalled Pistoes" >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [INFO] Liberando porta 3000 no firewall...
-    netsh advfirewall firewall add rule name="CRM Kalled Pistoes" dir=in action=allow protocol=TCP localport=3000 >nul 2>&1
+    echo [INFO] Primeira vez: liberando porta 3000 no firewall...
+    echo [INFO] Clique em "Sim" na janela de permissao que aparecer.
+    powershell -NoProfile -Command "Start-Process netsh -ArgumentList 'advfirewall firewall add rule name=""CRM Kalled Pistoes"" dir=in action=allow protocol=TCP localport=3000' -Verb RunAs -Wait" >nul 2>&1
 )
 
 :: Descobre o IP da rede local (ignora adaptadores virtuais/VPN)
