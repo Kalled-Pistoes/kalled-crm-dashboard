@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^8.0.0",
-    "@fastify/static": "^9.0.0",
+    "@fastify/static": "^7.0.4",
     "fastify": "^4.0.0",
     "xlsx": "^0.18.5"
   },

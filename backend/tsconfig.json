@@ -13,10 +13,14 @@
     "outDir": "./dist",
     "rootDir": "./"
   },
+  "ts-node": {
+    "esm": true
+  },
   "include": [
-    "**/*.ts"
+    "index.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "dist"
   ]
 }
