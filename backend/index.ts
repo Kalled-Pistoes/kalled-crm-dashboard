@@ -6,6 +6,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
+import { randomUUID } from 'crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -14,6 +17,23 @@ const fastify = Fastify({ logger: true });
 
 // ── Caminho do Excel ──────────────────────────────────────────────────────────
 const EXCEL_PATH = path.resolve(__dirname, '../Base de Dados de Vendas.xlsx');
+
+// ── Auth ───────────────────────────────────────────────────────────────────────
+const USERS_PATH = path.join(__dirname, 'data', 'users.json');
+const JWT_SECRET = process.env.JWT_SECRET ?? 'crm-kalled-local-2025';
+
+interface AuthUser {
+    id: string;
+    username: string;
+    role: string;
+    representante: string | null;
+}
+
+declare module 'fastify' {
+    interface FastifyRequest {
+        user?: AuthUser;
+    }
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function parseCurrency(value: any): number {
@@ -54,6 +74,7 @@ interface Mappings {
     skuToLine: Record<string, string[]>;
     clienteToGrupo: Record<string, string>;
     clienteToEstado: Record<string, string>;
+    clienteToRep: Record<string, string>;
 }
 
 function filterData(data: any[], query: any, mappings: Mappings, limitYTD: boolean = false) {
@@ -88,6 +109,15 @@ function filterData(data: any[], query: any, mappings: Mappings, limitYTD: boole
             const cli = getRowValue(row, 'Cliente', 'cliente');
             const cliGrupo = mappings.clienteToGrupo[cli] || 'Sem Grupo';
             if (cliGrupo !== grupo) return false;
+        }
+
+        // Filtro por representante (automático via JWT — injeta _representante na query)
+        const _representante = (query as any)._representante;
+        if (_representante) {
+            const cli = String(getRowValue(row, 'Cliente', 'cliente') || '').trim();
+            const directRep = String(getRowValue(row, 'Representante', 'representante', 'Vendedor', 'vendedor') || '').trim();
+            const repViaCliente = cli ? mappings.clienteToRep[cli] : undefined;
+            if (repViaCliente !== _representante && directRep !== _representante) return false;
         }
 
         return true;
@@ -187,7 +217,7 @@ function getMappings(wb: XLSX.WorkBook): Mappings {
         if (estado) clienteToEstado[cli] = estado;
     });
 
-    return { skuToLine, clienteToGrupo, clienteToEstado };
+    return { skuToLine, clienteToGrupo, clienteToEstado, clienteToRep };
 }
 
 // ── Cors ──────────────────────────────────────────────────────────────────────
@@ -202,6 +232,115 @@ if (fs.existsSync(frontendDist)) {
         decorateReply: false,
     });
 }
+
+// ── Auth Helpers ───────────────────────────────────────────────────────────────
+async function initUsers() {
+    const dir = path.dirname(USERS_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    if (!fs.existsSync(USERS_PATH)) {
+        const hash = await bcrypt.hash('admin123!', 10);
+        fs.writeFileSync(USERS_PATH, JSON.stringify([{
+            id: randomUUID(), username: 'admin', passwordHash: hash,
+            role: 'admin', representante: null, createdAt: new Date().toISOString()
+        }], null, 2));
+        console.log('[CRM] Usuário admin criado: admin / admin123!');
+    }
+}
+
+function readUsers(): any[] { return JSON.parse(fs.readFileSync(USERS_PATH, 'utf8')); }
+function writeUsers(users: any[]) { fs.writeFileSync(USERS_PATH, JSON.stringify(users, null, 2)); }
+
+function requireAdmin(request: any, reply: any): boolean {
+    if (request.user?.role !== 'admin') {
+        reply.status(403).send({ error: 'Acesso restrito ao administrador' });
+        return false;
+    }
+    return true;
+}
+
+// ── Middleware: JWT Auth ───────────────────────────────────────────────────────
+fastify.addHook('preHandler', async (request, reply) => {
+    if (!request.url.startsWith('/api/')) return;
+    if (request.url.startsWith('/api/auth/') || request.url === '/api/health') return;
+    const auth = request.headers.authorization;
+    if (!auth?.startsWith('Bearer ')) return reply.status(401).send({ error: 'Token de acesso necessário' });
+    try {
+        const payload = jwt.verify(auth.slice(7), JWT_SECRET) as any;
+        request.user = { id: payload.id, username: payload.username, role: payload.role, representante: payload.representante };
+        if (payload.role === 'representante' && payload.representante) {
+            (request.query as any)._representante = payload.representante;
+        }
+    } catch {
+        return reply.status(401).send({ error: 'Token inválido ou expirado' });
+    }
+});
+
+// ── Auth Endpoints ─────────────────────────────────────────────────────────────
+fastify.post('/api/auth/login', async (request, reply) => {
+    const { username, password } = request.body as { username: string; password: string };
+    if (!username || !password) return reply.status(400).send({ error: 'Usuário e senha são obrigatórios' });
+    const users = readUsers();
+    const user = users.find((u: any) => u.username === username);
+    if (!user || !await bcrypt.compare(password, user.passwordHash))
+        return reply.status(401).send({ error: 'Usuário ou senha incorretos' });
+    const payload = { id: user.id, username: user.username, role: user.role, representante: user.representante };
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '8h' });
+    return { token, user: payload };
+});
+
+fastify.get('/api/auth/me', async (request) => request.user);
+
+fastify.get('/api/admin/users', async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    return readUsers().map(({ passwordHash: _, ...u }: any) => u);
+});
+
+fastify.post('/api/admin/users', async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    const { username, password, role, representante } = request.body as any;
+    if (!username || !password || !role)
+        return reply.status(400).send({ error: 'Campos obrigatórios: username, password, role' });
+    const users = readUsers();
+    if (users.find((u: any) => u.username === username))
+        return reply.status(409).send({ error: 'Usuário já existe' });
+    const newUser = {
+        id: randomUUID(), username,
+        passwordHash: await bcrypt.hash(password, 10),
+        role, representante: representante || null, createdAt: new Date().toISOString()
+    };
+    users.push(newUser);
+    writeUsers(users);
+    const { passwordHash: _, ...out } = newUser;
+    return reply.status(201).send(out);
+});
+
+fastify.put('/api/admin/users/:id', async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    const { id } = request.params as { id: string };
+    const { password, role, representante } = request.body as any;
+    const users = readUsers();
+    const idx = users.findIndex((u: any) => u.id === id);
+    if (idx === -1) return reply.status(404).send({ error: 'Usuário não encontrado' });
+    if (password) users[idx].passwordHash = await bcrypt.hash(password, 10);
+    if (role !== undefined) users[idx].role = role;
+    if (representante !== undefined) users[idx].representante = representante || null;
+    writeUsers(users);
+    const { passwordHash: _, ...out } = users[idx];
+    return out;
+});
+
+fastify.delete('/api/admin/users/:id', async (request, reply) => {
+    if (!requireAdmin(request, reply)) return;
+    const { id } = request.params as { id: string };
+    if (id === request.user?.id)
+        return reply.status(400).send({ error: 'Não é possível excluir sua própria conta' });
+    const users = readUsers();
+    const idx = users.findIndex((u: any) => u.id === id);
+    if (idx === -1) return reply.status(404).send({ error: 'Usuário não encontrado' });
+    users.splice(idx, 1);
+    writeUsers(users);
+    return { success: true };
+});
 
 // ── Endpoints ─────────────────────────────────────────────────────────────────
 fastify.get('/api/health', async () => ({ status: 'ok', message: 'CRM Backend rodando (v3)' }));
@@ -228,11 +367,21 @@ fastify.get('/api/dashboard/stats', async (request, reply) => {
         const sumValues = (arr: any[]) => arr.reduce((acc, r) => acc + parseCurrency(getRowValue(r, 'Valor', 'valor')), 0);
         const sumPecas = (arr: any[]) => arr.reduce((acc, r) => acc + (parseFloat(getRowValue(r, 'Quantidade', 'quantidade')) || 0), 0);
 
+        const _userRep = (query as any)._representante;
+        const _rawClis = getSheet(wb, 'Clientes');
+        const _rawReps = getSheet(wb, 'Metas Representantes');
+        const totalClientesCount = _userRep
+            ? _rawClis.filter((c: any) => String(getRowValue(c, 'Representante', 'representante') || '').trim() === _userRep).length
+            : _rawClis.length;
+        const totalRepsCount = _userRep
+            ? _rawReps.filter((r: any) => String(getRowValue(r, 'Vendedor', 'vendedor') || '').trim() === _userRep).length
+            : _rawReps.length;
+
         return {
             totalVendas: vendas.length,
-            totalClientes: getSheet(wb, 'Clientes').length,
+            totalClientes: totalClientesCount,
             totalProdutos: getSheet(wb, 'Cross').length,
-            totalRepresentantes: getSheet(wb, 'Metas Representantes').length,
+            totalRepresentantes: totalRepsCount,
             valorTotalVendas: sumValues(vendas),
             valorTotalVendasAnoAnterior: sumValues(vendasAnterior),
             totalPecas: sumPecas(vendas),
@@ -469,7 +618,11 @@ fastify.get('/api/clientes', async (request, reply) => {
 
         const today = new Date(); // Local time reference
 
-        const clientesEnriquecidos = clientesStr.map((c: any) => {
+        const _userRep = (request.query as any)._representante;
+        const filteredClientesStr = _userRep
+            ? clientesStr.filter((c: any) => String(getRowValue(c, 'Representante', 'representante') || '').trim() === _userRep)
+            : clientesStr;
+        const clientesEnriquecidos = filteredClientesStr.map((c: any) => {
             const nomeCli = getRowValue(c, 'Cliente', 'cliente', 'Razão Social') ?? '';
             const normCli = normalizeName(nomeCli);
             const ultimaCompra = ultimaCompraMap[normCli];
@@ -568,11 +721,17 @@ fastify.get('/api/representantes', async (request, reply) => {
     try {
         const wb = loadWorkbook();
         const rawReps = getSheet(wb, 'Metas Representantes');
-        return rawReps.map((row: any) => ({
-            nome: getRowValue(row, 'Vendedor', 'vendedor') ?? '',
-            meta: parseFloat(getRowValue(row, 'Meta', 'meta')) || 0,
-            estado: getRowValue(row, 'Estado', 'estado') ?? '',
-        })).filter((r: any) => r.nome);
+        const _userRep = (request.query as any)._representante;
+        return rawReps
+            .filter((row: any) => {
+                if (!_userRep) return true;
+                return String(getRowValue(row, 'Vendedor', 'vendedor') || '').trim() === _userRep;
+            })
+            .map((row: any) => ({
+                nome: getRowValue(row, 'Vendedor', 'vendedor') ?? '',
+                meta: parseFloat(getRowValue(row, 'Meta', 'meta')) || 0,
+                estado: getRowValue(row, 'Estado', 'estado') ?? '',
+            })).filter((r: any) => r.nome);
     } catch (e: any) { reply.status(500).send({ error: e.message }); }
 });
 
@@ -765,6 +924,8 @@ fastify.setNotFoundHandler((request, reply) => {
 // Iniciando
 const start = async () => {
     try {
+        // Inicializa usuários (cria admin se necessário)
+        await initUsers();
         // Pré-carrega o Excel em cache antes de abrir o servidor
         try {
             loadWorkbook();

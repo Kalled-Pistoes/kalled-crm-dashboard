@@ -1,27 +1,37 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { AuthProvider } from './contexts/AuthContext';
+import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
+import Login from './pages/Login';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Clientes = lazy(() => import('./pages/Clientes'));
 const Vendas = lazy(() => import('./pages/Vendas'));
 const Representantes = lazy(() => import('./pages/Representantes'));
 const Visitas = lazy(() => import('./pages/Visitas'));
+const GerenciarUsuarios = lazy(() => import('./pages/GerenciarUsuarios'));
+
+const fallback = <div className="flex items-center justify-center h-full text-slate-400 text-sm">Carregando...</div>;
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Layout>
-        <Suspense fallback={<div className="flex items-center justify-center h-full text-slate-400 text-sm">Carregando...</div>}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/vendas" element={<Vendas />} />
-            <Route path="/clientes" element={<Clientes />} />
-            <Route path="/representantes" element={<Representantes />} />
-            <Route path="/visitas" element={<Visitas />} />
-          </Routes>
-        </Suspense>
-      </Layout>
-    </BrowserRouter>
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<Layout />}>
+              <Route index element={<Suspense fallback={fallback}><Dashboard /></Suspense>} />
+              <Route path="/vendas" element={<Suspense fallback={fallback}><Vendas /></Suspense>} />
+              <Route path="/clientes" element={<Suspense fallback={fallback}><Clientes /></Suspense>} />
+              <Route path="/representantes" element={<Suspense fallback={fallback}><Representantes /></Suspense>} />
+              <Route path="/visitas" element={<Suspense fallback={fallback}><Visitas /></Suspense>} />
+              <Route path="/usuarios" element={<Suspense fallback={fallback}><GerenciarUsuarios /></Suspense>} />
+            </Route>
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }

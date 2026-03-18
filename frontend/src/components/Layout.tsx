@@ -1,4 +1,4 @@
-import { useSearchParams, NavLink, useLocation } from 'react-router-dom';
+import { useSearchParams, NavLink, useLocation, Outlet } from 'react-router-dom';
 import {
     LayoutDashboard,
     Users,
@@ -6,25 +6,16 @@ import {
     UserCheck,
     TrendingUp,
     MapPin,
-    Home,
-    ArrowLeftRight
+    LogOut,
+    UserCog,
+    User,
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
-const navItems = [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/vendas', icon: ShoppingCart, label: 'Vendas' },
-    { to: '/clientes', icon: Users, label: 'Clientes' },
-    { to: '/representantes', icon: UserCheck, label: 'Representantes' },
-    { to: '/visitas', icon: MapPin, label: 'Visitas' },
-];
-
-interface LayoutProps {
-    children: React.ReactNode;
-}
-
-export default function Layout({ children }: LayoutProps) {
+export default function Layout() {
     const [searchParams, setSearchParams] = useSearchParams();
     const { pathname } = useLocation();
+    const { user, logout, isAdmin, isRep } = useAuth();
 
     const isClientesPage = pathname === '/clientes';
     const isRepresentantesPage = pathname === '/representantes';
@@ -58,6 +49,15 @@ export default function Layout({ children }: LayoutProps) {
         { val: '12', label: 'Dezembro' },
     ];
 
+    const navItems = [
+        { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
+        { to: '/vendas', icon: ShoppingCart, label: 'Vendas' },
+        { to: '/clientes', icon: Users, label: 'Clientes' },
+        { to: '/representantes', icon: UserCheck, label: 'Representantes' },
+        { to: '/visitas', icon: MapPin, label: 'Visitas' },
+        ...(isAdmin ? [{ to: '/usuarios', icon: UserCog, label: 'Usuários' }] : []),
+    ];
+
     return (
         <div className="flex flex-col h-screen bg-pbi-bg text-pbi-text overflow-hidden relative">
             {/* Background Spotlight Effects */}
@@ -86,8 +86,8 @@ export default function Layout({ children }: LayoutProps) {
                     <h1 className="hidden md:block text-lg font-medium tracking-tight uppercase">VISÃO GERAL DE VENDAS</h1>
                 </div>
 
-                {/* Filters / Nav Area */}
-                <div className="flex items-center gap-2 sm:gap-4">
+                {/* Nav + User */}
+                <div className="flex items-center gap-2 sm:gap-3">
                     <div className="flex items-center bg-white/5 border border-white/5 rounded-xl p-1 backdrop-blur-sm">
                         {navItems.map(({ to, icon: Icon, label }) => (
                             <NavLink
@@ -107,14 +107,34 @@ export default function Layout({ children }: LayoutProps) {
                         ))}
                     </div>
 
-                    <div className="hidden sm:block h-6 w-px bg-white/10 mx-1" />
+                    <div className="hidden sm:block h-6 w-px bg-white/10" />
 
-                    <div className="hidden sm:flex items-center gap-3">
-                        <ArrowLeftRight className="w-5 h-5 text-slate-400 hover:text-white cursor-pointer transition-colors" />
-                        <Home className="w-5 h-5 text-slate-400 hover:text-white cursor-pointer transition-colors" />
+                    {/* User info + logout */}
+                    <div className="flex items-center gap-2">
+                        <div className="hidden sm:flex items-center gap-2 bg-white/5 rounded-xl px-2.5 py-1.5">
+                            <User className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+                            <span className="text-xs font-medium text-slate-300 max-w-[100px] truncate">{user?.username}</span>
+                        </div>
+                        <button
+                            onClick={logout}
+                            title="Sair"
+                            className="p-2 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
+                        >
+                            <LogOut className="w-4 h-4" />
+                        </button>
                     </div>
                 </div>
             </header>
+
+            {/* Rep banner */}
+            {isRep && user?.representante && (
+                <div className="bg-sky-500/10 border-b border-sky-500/20 px-4 sm:px-6 py-2 flex items-center gap-2 z-10 flex-shrink-0">
+                    <UserCheck className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+                    <span className="text-xs text-sky-300">
+                        Você está visualizando dados de: <strong className="font-semibold text-white">{user.representante}</strong>
+                    </span>
+                </div>
+            )}
 
             {/* Filter Sub-header */}
             <div className="bg-pbi-navy/40 backdrop-blur-sm text-white flex-shrink-0 text-xs shadow-sm border-b border-white/5 z-10 overflow-x-auto">
@@ -158,7 +178,7 @@ export default function Layout({ children }: LayoutProps) {
 
             {/* Content Area */}
             <main className="flex-1 overflow-y-auto p-3 sm:p-4 lg:p-6 bg-transparent z-10">
-                {children}
+                <Outlet />
             </main>
 
             {/* Micro Footer */}
