@@ -42,7 +42,7 @@ if (!SUPABASE_URL || !SUPABASE_KEY) {
 }
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-const EXCEL_PATH = path.resolve(__dirname, '../../Base de Dados de Vendas.xlsx');
+const EXCEL_PATH = process.env.EXCEL_PATH || path.resolve(__dirname, '../../Base de Dados de Vendas.xlsx');
 
 // ── Helpers (mesma logica do backend/index.ts) ─────────────────────────────────
 function parseCurrency(value: any): number {
