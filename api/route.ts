@@ -6,9 +6,9 @@ import { JWT_SECRET, requireAuth, requireAdmin, getRepresentanteId } from './_li
 import { applyDateFilter, applyVendasFilters, groupBySum, toYearMonth, toYear } from './_lib/filters';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    const pathParts = Array.isArray(req.query.path)
-        ? req.query.path as string[]
-        : [req.query.path as string].filter(Boolean);
+    // Parse path from URL: /api/auth/login → ['auth', 'login']
+    const rawPath = (req.url || '').split('?')[0].replace(/^\/api\//, '').replace(/^\/api$/, '');
+    const pathParts = rawPath.split('/').filter(Boolean);
     const [s0, s1, s2] = pathParts;
 
     try {
