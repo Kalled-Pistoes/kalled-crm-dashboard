@@ -1,6 +1,0 @@
-{
-  "watch": ["index.ts"],
-  "ext": "ts",
-  "ignore": ["node_modules", "dist", "debug_*.ts", "debug_*.js", "test_*.js"],
-  "exec": "node --loader ts-node/esm index.ts"
-}
