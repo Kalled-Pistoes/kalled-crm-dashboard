@@ -191,12 +191,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!user) return;
             const repId = await getRepresentanteId(user);
             let q: any = supabase.from('vendas')
-                .select('valor, cliente:cliente_id(uf)');
+                .select('valor, cliente:cliente_id(uf, representante:representante_id(estado))');
             q = await applyVendasFilters(supabase, q, req.query as any, repId);
             const data = await fetchAllPages(q);
             const map: Record<string, number> = {};
             for (const r of data) {
-                const estado = (r.cliente as any)?.uf || 'Outros';
+                const estado = (r.cliente as any)?.uf || (r.cliente as any)?.representante?.estado || 'Outros';
                 map[estado] = (map[estado] || 0) + (r.valor || 0);
             }
             return res.json(Object.entries(map).map(([estado, total]) => ({ estado, total }))
@@ -313,7 +313,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!user) return;
             const repId = await getRepresentanteId(user);
             let q: any = supabase.from('vendas')
-                .select('valor, cliente:cliente_id(nome, uf)');
+                .select('valor, cliente:cliente_id(nome, uf, representante:representante_id(estado))');
             q = await applyVendasFilters(supabase, q, req.query as any, repId);
             const data = await fetchAllPages(q);
             const map: Record<string, { totalVendas: number; valorTotal: number; estado: string }> = {};
@@ -322,7 +322,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (!nome) continue;
                 if (!map[nome]) map[nome] = {
                     totalVendas: 0, valorTotal: 0,
-                    estado: (r.cliente as any)?.uf || '',
+                    estado: (r.cliente as any)?.uf || (r.cliente as any)?.representante?.estado || '',
                 };
                 map[nome].totalVendas += 1;
                 map[nome].valorTotal += r.valor || 0;
