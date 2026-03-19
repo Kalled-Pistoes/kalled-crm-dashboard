@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { supabase } from './_lib/supabase';
 import { JWT_SECRET, requireAuth, requireAdmin, getRepresentanteId } from './_lib/auth';
-import { applyDateFilter, applyVendasFilters, groupBySum, toYearMonth, toYear } from './_lib/filters';
+import { applyDateFilter, applyVendasFilters, fetchAllPages, groupBySum, toYearMonth, toYear } from './_lib/filters';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Parse path from URL: /api/auth/login → ['auth', 'login']
@@ -103,7 +103,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             let qCurr: any = supabase.from('vendas').select('valor, quantidade');
             qCurr = await applyVendasFilters(supabase, qCurr, q, repId);
-            const { data: vendasCurr } = await qCurr.limit(100000);
+            const vendasCurr = await fetchAllPages(qCurr);
 
             let qPrev: any = supabase.from('vendas').select('valor, quantidade');
             qPrev = await applyVendasFilters(supabase, qPrev, { ...q, ano: prevYear }, repId);
@@ -111,10 +111,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const maxMes = String(today.getMonth() + 1).padStart(2, '0');
                 qPrev = qPrev.lte('data', `${prevYear}-${maxMes}-31`);
             }
-            const { data: vendasPrev } = await qPrev.limit(100000);
+            const vendasPrev = await fetchAllPages(qPrev);
 
-            const sumValor = (rows: any[]) => (rows || []).reduce((s: number, r: any) => s + (r.valor || 0), 0);
-            const sumQtd = (rows: any[]) => (rows || []).reduce((s: number, r: any) => s + (r.quantidade || 0), 0);
+            const sumValor = (rows: any[]) => rows.reduce((s: number, r: any) => s + (r.valor || 0), 0);
+            const sumQtd = (rows: any[]) => rows.reduce((s: number, r: any) => s + (r.quantidade || 0), 0);
 
             let totalClientes: number, totalReps: number;
             if (repId) {
@@ -131,14 +131,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const { count: totalProd } = await supabase.from('produtos').select('id', { count: 'exact', head: true });
 
             return res.json({
-                totalVendas: (vendasCurr || []).length,
+                totalVendas: vendasCurr.length,
                 totalClientes,
                 totalProdutos: totalProd || 0,
                 totalRepresentantes: totalReps,
-                valorTotalVendas: sumValor(vendasCurr || []),
-                valorTotalVendasAnoAnterior: sumValor(vendasPrev || []),
-                totalPecas: sumQtd(vendasCurr || []),
-                totalPecasAnoAnterior: sumQtd(vendasPrev || []),
+                valorTotalVendas: sumValor(vendasCurr),
+                valorTotalVendasAnoAnterior: sumValor(vendasPrev),
+                totalPecas: sumQtd(vendasCurr),
+                totalPecasAnoAnterior: sumQtd(vendasPrev),
             });
         }
 
@@ -151,7 +151,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 .select('data, valor, quantidade, cliente:cliente_id(nome), produto:produto_id(pn)')
                 .order('data', { ascending: false });
             q = await applyVendasFilters(supabase, q, req.query as any, repId);
-            const { data, error } = await q.limit(5000);
+            const { data, error } = await q.limit(1000);
             if (error) return res.status(500).json({ error: error.message });
             return res.json((data || []).map((r: any) => ({
                 data: r.data, cliente: r.cliente?.nome ?? '', codigo: r.produto?.pn ?? '',
@@ -181,9 +181,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const repId = await getRepresentanteId(user);
             let q: any = supabase.from('vendas').select('data, valor');
             q = await applyVendasFilters(supabase, q, req.query as any, repId);
-            const { data, error } = await q.limit(100000);
-            if (error) return res.status(500).json({ error: error.message });
-            const map = groupBySum(data || [], (r: any) => toYearMonth(r.data), (r: any) => r.valor || 0);
+            const data = await fetchAllPages(q);
+            const map = groupBySum(data, (r: any) => toYearMonth(r.data), (r: any) => r.valor || 0);
             return res.json(Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([mes, total]) => ({ mes, total })));
         }
 
@@ -194,10 +193,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             let q: any = supabase.from('vendas')
                 .select('valor, cliente:cliente_id(representante:representante_id(estado))');
             q = await applyVendasFilters(supabase, q, req.query as any, repId);
-            const { data, error } = await q.limit(100000);
-            if (error) return res.status(500).json({ error: error.message });
+            const data = await fetchAllPages(q);
             const map: Record<string, number> = {};
-            for (const r of (data || [])) {
+            for (const r of data) {
                 const estado = (r.cliente as any)?.representante?.estado || 'Desconhecido';
                 map[estado] = (map[estado] || 0) + (r.valor || 0);
             }
@@ -214,11 +212,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 .select('valor_pedido, representante:representante_id(id, nome, meta_mensal)');
             qVR = applyDateFilter(qVR, q, { defaultCurrentYear: true });
             if (repId) qVR = qVR.eq('representante_id', repId);
-            const { data: vendasRep, error } = await qVR.limit(100000);
-            if (error) return res.status(500).json({ error: error.message });
+            const vendasRep = await fetchAllPages(qVR);
             const numMeses = q.mes ? 1 : new Date().getMonth() + 1;
             const map: Record<string, { nome: string; faturamento: number; metaMensal: number }> = {};
-            for (const r of (vendasRep || [])) {
+            for (const r of vendasRep) {
                 const rep = r.representante as any;
                 if (!rep?.nome) continue;
                 if (!map[rep.nome]) map[rep.nome] = { nome: rep.nome, faturamento: 0, metaMensal: rep.meta_mensal || 0 };
@@ -236,10 +233,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const repId = await getRepresentanteId(user);
             let q: any = supabase.from('vendas').select('quantidade, produto:produto_id(pn)');
             q = await applyVendasFilters(supabase, q, req.query as any, repId);
-            const { data, error } = await q.limit(100000);
-            if (error) return res.status(500).json({ error: error.message });
+            const data = await fetchAllPages(q);
             const map: Record<string, number> = {};
-            for (const r of (data || [])) {
+            for (const r of data) {
                 const pn = (r.produto as any)?.pn;
                 if (pn) map[pn] = (map[pn] || 0) + (r.quantidade || 0);
             }
@@ -253,9 +249,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const repId = await getRepresentanteId(user);
             let q: any = supabase.from('vendas').select('data, valor');
             if (repId) q = q.eq('representante_id', repId);
-            const { data, error } = await q.limit(100000);
-            if (error) return res.status(500).json({ error: error.message });
-            const map = groupBySum(data || [], (r: any) => toYear(r.data), (r: any) => r.valor || 0);
+            const data = await fetchAllPages(q);
+            const map = groupBySum(data, (r: any) => toYear(r.data), (r: any) => r.valor || 0);
             return res.json(Object.entries(map).map(([ano, total]) => ({ ano, total }))
                 .sort((a, b) => a.ano.localeCompare(b.ano)));
         }
@@ -268,10 +263,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 .select('valor_pedido, representante:representante_id(nome, meta_mensal)');
             q = applyDateFilter(q, req.query as any, { defaultCurrentYear: true });
             if (repId) q = q.eq('representante_id', repId);
-            const { data, error } = await q.limit(100000);
-            if (error) return res.status(500).json({ error: error.message });
+            const data = await fetchAllPages(q);
             const map: Record<string, { totalVendas: number; meta?: number }> = {};
-            for (const r of (data || [])) {
+            for (const r of data) {
                 const nome = (r.representante as any)?.nome;
                 if (!nome) continue;
                 if (!map[nome]) map[nome] = { totalVendas: 0, meta: (r.representante as any)?.meta_mensal };
@@ -292,9 +286,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (cliErr) return res.status(500).json({ error: cliErr.message });
             let qVendas: any = supabase.from('vendas').select('data, cliente:cliente_id(nome)');
             if (repId) qVendas = qVendas.eq('representante_id', repId);
-            const { data: vendas } = await qVendas.limit(100000);
+            const vendas = await fetchAllPages(qVendas);
             const ultimaCompraMap: Record<string, string> = {};
-            for (const v of (vendas || [])) {
+            for (const v of vendas) {
                 const nome = (v.cliente as any)?.nome;
                 if (nome && v.data && (!ultimaCompraMap[nome] || v.data > ultimaCompraMap[nome]))
                     ultimaCompraMap[nome] = v.data;
@@ -321,10 +315,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             let q: any = supabase.from('vendas')
                 .select('valor, cliente:cliente_id(nome, representante:representante_id(estado))');
             q = await applyVendasFilters(supabase, q, req.query as any, repId);
-            const { data, error } = await q.limit(100000);
-            if (error) return res.status(500).json({ error: error.message });
+            const data = await fetchAllPages(q);
             const map: Record<string, { totalVendas: number; valorTotal: number; estado: string }> = {};
-            for (const r of (data || [])) {
+            for (const r of data) {
                 const nome = (r.cliente as any)?.nome;
                 if (!nome) continue;
                 if (!map[nome]) map[nome] = {
@@ -344,10 +337,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const nome = decodeURIComponent(s1);
             const { data: cli } = await supabase.from('clientes').select('id').ilike('nome', nome).single();
             if (!cli) return res.json([]);
-            const { data, error } = await supabase.from('vendas').select('data, valor')
-                .eq('cliente_id', cli.id).limit(100000);
-            if (error) return res.status(500).json({ error: error.message });
-            const map = groupBySum(data || [], (r: any) => toYearMonth(r.data), (r: any) => r.valor || 0);
+            const data = await fetchAllPages(supabase.from('vendas').select('data, valor').eq('cliente_id', cli.id));
+            const map = groupBySum(data, (r: any) => toYearMonth(r.data), (r: any) => r.valor || 0);
             return res.json(Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([mes, total]) => ({ mes, total })));
         }
 
@@ -357,9 +348,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const nome = decodeURIComponent(s1);
             const { data: cli } = await supabase.from('clientes').select('id').ilike('nome', nome).single();
             if (!cli) return res.json({ totalItens: 0, totalComprados: 0, naoComprados: [] });
-            const { data: vendas } = await supabase.from('vendas').select('produto:produto_id(pn)')
-                .eq('cliente_id', cli.id).limit(100000);
-            const skusComprados = new Set((vendas || []).map((v: any) => v.produto?.pn).filter(Boolean));
+            const vendas = await fetchAllPages(supabase.from('vendas').select('produto:produto_id(pn)').eq('cliente_id', cli.id));
+            const skusComprados = new Set(vendas.map((v: any) => v.produto?.pn).filter(Boolean));
             const { data: produtos, error } = await supabase.from('produtos').select('pn, descricao, linhas');
             if (error) return res.status(500).json({ error: error.message });
             const naoComprados = (produtos || []).filter(p => !skusComprados.has(p.pn)).map(p => {
@@ -389,10 +379,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 ? user.representante : decodeURIComponent(s1);
             const { data: rep } = await supabase.from('representantes').select('id').ilike('nome', nome).single();
             if (!rep) return res.json([]);
-            const { data, error } = await supabase.from('vendas_representantes').select('data, valor_pedido')
-                .eq('representante_id', rep.id).limit(100000);
-            if (error) return res.status(500).json({ error: error.message });
-            const map = groupBySum(data || [], (r: any) => toYearMonth(r.data), (r: any) => r.valor_pedido || 0);
+            const data = await fetchAllPages(
+                supabase.from('vendas_representantes').select('data, valor_pedido').eq('representante_id', rep.id)
+            );
+            const map = groupBySum(data, (r: any) => toYearMonth(r.data), (r: any) => r.valor_pedido || 0);
             return res.json(Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([mes, total]) => ({ mes, total })));
         }
 
@@ -420,10 +410,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const { data: clientes } = await supabase.from('clientes').select('id, nome').eq('representante_id', rep.id);
             if (!clientes?.length) return res.json([]);
             const cliIds = clientes.map(c => c.id);
-            const { data: vendas } = await supabase.from('vendas').select('data, cliente_id')
-                .in('cliente_id', cliIds).limit(100000);
+            const vendas = await fetchAllPages(
+                supabase.from('vendas').select('data, cliente_id').in('cliente_id', cliIds)
+            );
             const ultimaCompraMap: Record<string, string> = {};
-            for (const v of (vendas || [])) {
+            for (const v of vendas) {
                 if (v.data && (!ultimaCompraMap[v.cliente_id] || v.data > ultimaCompraMap[v.cliente_id]))
                     ultimaCompraMap[v.cliente_id] = v.data;
             }
@@ -447,10 +438,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!rep) return res.json([]);
             const meta = (rep as any).meta_mensal || 0;
 
-            const { data: vendasRep } = await supabase.from('vendas_representantes')
-                .select('data, valor_pedido').eq('representante_id', (rep as any).id).limit(100000);
+            const vendasRep = await fetchAllPages(
+                supabase.from('vendas_representantes').select('data, valor_pedido').eq('representante_id', (rep as any).id)
+            );
             const totaisMap: Record<string, number> = {};
-            for (const r of (vendasRep || [])) {
+            for (const r of vendasRep) {
                 if (mes && r.data.substring(5, 7) !== mes) continue;
                 const ano = r.data.substring(0, 4);
                 totaisMap[ano] = (totaisMap[ano] || 0) + (r.valor_pedido || 0);
@@ -461,11 +453,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const cliNomeMap: Record<string, string> = {};
             for (const c of (clientes || [])) cliNomeMap[(c as any).id] = (c as any).nome;
 
-            const { data: vendas } = await supabase.from('vendas').select('data, valor, cliente_id')
-                .in('cliente_id', cliIds.length > 0 ? cliIds : ['00000000-0000-0000-0000-000000000000'])
-                .limit(100000);
+            const vendas = await fetchAllPages(
+                supabase.from('vendas').select('data, valor, cliente_id')
+                    .in('cliente_id', cliIds.length > 0 ? cliIds : ['00000000-0000-0000-0000-000000000000'])
+            );
             const clientesMap: Record<string, Map<string, number>> = {};
-            for (const v of (vendas || [])) {
+            for (const v of vendas) {
                 if (mes && v.data.substring(5, 7) !== mes) continue;
                 const ano = v.data.substring(0, 4);
                 const nomeCliente = cliNomeMap[v.cliente_id] || '';

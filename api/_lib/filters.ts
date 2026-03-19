@@ -87,6 +87,21 @@ export async function applyVendasFilters(
     });
 }
 
+// Busca todas as páginas de uma query (Supabase limita 1000 rows por request por padrão)
+export async function fetchAllPages(q: any, pageSize = 1000): Promise<any[]> {
+    const results: any[] = [];
+    let offset = 0;
+    while (true) {
+        const { data, error } = await q.range(offset, offset + pageSize - 1);
+        if (error) throw new Error(error.message);
+        if (!data || data.length === 0) break;
+        results.push(...data);
+        if (data.length < pageSize) break;
+        offset += pageSize;
+    }
+    return results;
+}
+
 // Agrupa array por chave e soma um campo numérico
 export function groupBySum<T>(
     rows: T[],
