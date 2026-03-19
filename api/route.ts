@@ -350,11 +350,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!cli) return res.json({ totalItens: 0, totalComprados: 0, naoComprados: [] });
             const vendas = await fetchAllPages(supabase.from('vendas').select('produto:produto_id(pn)').eq('cliente_id', cli.id));
             const skusComprados = new Set(vendas.map((v: any) => v.produto?.pn).filter(Boolean));
-            const { data: produtos, error } = await supabase.from('produtos').select('pn, descricao, linhas');
+            const { data: produtos, error } = await supabase.from('produtos').select('pn, descricao, linhas, ref_metal_leve, ref_sulloy, ref_ks, ref_apex');
             if (error) return res.status(500).json({ error: error.message });
             const naoComprados = (produtos || []).filter(p => !skusComprados.has(p.pn)).map(p => {
                 const refs: Record<string, string> = {};
-                for (const linha of (p.linhas || [])) refs[linha] = linha;
+                if (p.ref_metal_leve) refs['Metal Leve'] = p.ref_metal_leve;
+                if (p.ref_sulloy)     refs['Sulloy']     = p.ref_sulloy;
+                if (p.ref_ks)         refs['KS']         = p.ref_ks;
+                if (p.ref_apex)       refs['Apex']       = p.ref_apex;
                 return { pn: p.pn, descricao: p.descricao || '', linhas: p.linhas || [], refs };
             });
             return res.json({ totalItens: (produtos || []).length, totalComprados: skusComprados.size, naoComprados });

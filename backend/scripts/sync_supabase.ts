@@ -193,15 +193,24 @@ async function main() {
         .map((row: any) => {
             const pn = String(getRowValue(row, 'PN', 'pn') || '').trim();
             if (!pn) return null;
+            const toRef = (v: any) => v && String(v).trim() !== 'N/A' && String(v).trim() !== '' ? String(v).trim() : null;
+            const ref_metal_leve = toRef(getRowValue(row, 'Metal Leve'));
+            const ref_sulloy     = toRef(getRowValue(row, 'Sulloy'));
+            const ref_ks         = toRef(getRowValue(row, 'KS'));
+            const ref_apex       = toRef(getRowValue(row, 'Apex'));
             const linhas: string[] = [];
-            if (getRowValue(row, 'Metal Leve')) linhas.push('Metal Leve');
-            if (getRowValue(row, 'Sulloy'))     linhas.push('Sulloy');
-            if (getRowValue(row, 'KS'))         linhas.push('KS');
-            if (getRowValue(row, 'Apex'))       linhas.push('Apex');
+            if (ref_metal_leve) linhas.push('Metal Leve');
+            if (ref_sulloy)     linhas.push('Sulloy');
+            if (ref_ks)         linhas.push('KS');
+            if (ref_apex)       linhas.push('Apex');
             return {
                 pn,
                 descricao: String(getRowValue(row, 'Descrição', 'Descricao', 'descricao') || '').trim() || null,
                 linhas,
+                ref_metal_leve,
+                ref_sulloy,
+                ref_ks,
+                ref_apex,
             };
         })
         .filter(Boolean) as any[];
