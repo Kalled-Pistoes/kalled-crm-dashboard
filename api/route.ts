@@ -191,12 +191,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!user) return;
             const repId = await getRepresentanteId(user);
             let q: any = supabase.from('vendas')
-                .select('valor, cliente:cliente_id(representante:representante_id(estado))');
+                .select('valor, cliente:cliente_id(uf)');
             q = await applyVendasFilters(supabase, q, req.query as any, repId);
             const data = await fetchAllPages(q);
             const map: Record<string, number> = {};
             for (const r of data) {
-                const estado = (r.cliente as any)?.representante?.estado || 'Desconhecido';
+                const estado = (r.cliente as any)?.uf || 'Outros';
                 map[estado] = (map[estado] || 0) + (r.valor || 0);
             }
             return res.json(Object.entries(map).map(([estado, total]) => ({ estado, total }))
@@ -313,7 +313,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!user) return;
             const repId = await getRepresentanteId(user);
             let q: any = supabase.from('vendas')
-                .select('valor, cliente:cliente_id(nome, representante:representante_id(estado))');
+                .select('valor, cliente:cliente_id(nome, uf)');
             q = await applyVendasFilters(supabase, q, req.query as any, repId);
             const data = await fetchAllPages(q);
             const map: Record<string, { totalVendas: number; valorTotal: number; estado: string }> = {};
@@ -322,7 +322,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (!nome) continue;
                 if (!map[nome]) map[nome] = {
                     totalVendas: 0, valorTotal: 0,
-                    estado: (r.cliente as any)?.representante?.estado || 'Desconhecido',
+                    estado: (r.cliente as any)?.uf || '',
                 };
                 map[nome].totalVendas += 1;
                 map[nome].valorTotal += r.valor || 0;

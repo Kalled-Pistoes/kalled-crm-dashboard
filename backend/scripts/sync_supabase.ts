@@ -151,14 +151,25 @@ async function main() {
     const { data: repsData } = await supabase.from('representantes').select('id, nome');
     const repMap = new Map<string, string>((repsData || []).map(r => [r.nome, r.id]));
 
+    // Mapa nome_normalizado → estado para tolerar variações de nome (- vs /)
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const repEstadoMap = new Map<string, string>();
+    for (const row of rawMetas) {
+        const nome = String(getRowValue(row, 'Vendedor', 'vendedor') || '').trim();
+        const estado = String(getRowValue(row, 'Estado', 'estado') || '').trim();
+        if (nome && estado) repEstadoMap.set(normalize(nome), estado);
+    }
+
     // ── 2. CLIENTES ────────────────────────────────────────────────────────────
     console.log('\n[3/6] Sincronizando clientes...');
     const clientesToUpsert = rawClientes
         .map((row: any) => {
             const nome = String(getRowValue(row, 'Cliente', 'cliente', 'Razão Social') || '').trim();
             const repNome = String(getRowValue(row, 'Representante', 'representante') || '').trim();
+            const uf = repEstadoMap.get(normalize(repNome)) || null;
             return {
                 nome,
+                uf,
                 status:           String(getRowValue(row, 'Status', 'status') || '').trim() || null,
                 grupo:            String(getRowValue(row, 'Grupo', 'grupo') || '').trim() || null,
                 desconto:         String(getRowValue(row, 'Desconto', 'desconto') || '').trim() || null,
