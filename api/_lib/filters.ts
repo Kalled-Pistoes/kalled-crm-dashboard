@@ -54,6 +54,11 @@ export async function getClienteIdsForGrupo(supabase: SupabaseClient, grupo: str
 
 // Aplica todos os filtros comuns (linha, grupo, rep) a uma query de vendas
 // Usa defaultCurrentYear=true para garantir que tabelas grandes sejam sempre filtradas
+//
+// IMPORTANTE: retorna um Proxy que oculta .then/.catch/.finally do query builder.
+// Sem isso, funções async que retornam um Supabase query builder (que é "thenable")
+// o executam prematuramente via Promise Resolution Procedure — causando
+// "q.limit is not a function" no chamador.
 export async function applyVendasFilters(
     supabase: SupabaseClient,
     q: any,
@@ -64,15 +69,22 @@ export async function applyVendasFilters(
     if (repId) q = q.eq('representante_id', repId);
     if (filters.linha) {
         const ids = await getProdutoIdsForLinha(supabase, filters.linha);
-        if (ids.length === 0) return q.eq('id', '00000000-0000-0000-0000-000000000000'); // força vazio
-        q = q.in('produto_id', ids);
+        if (ids.length === 0) q = q.eq('id', '00000000-0000-0000-0000-000000000000');
+        else q = q.in('produto_id', ids);
     }
     if (filters.grupo) {
         const ids = await getClienteIdsForGrupo(supabase, filters.grupo);
-        if (ids.length === 0) return q.eq('id', '00000000-0000-0000-0000-000000000000');
-        q = q.in('cliente_id', ids);
+        if (ids.length === 0) q = q.eq('id', '00000000-0000-0000-0000-000000000000');
+        else q = q.in('cliente_id', ids);
     }
-    return q;
+    // Proxy oculta .then para o runtime não tratar o query builder como Promise
+    return new Proxy(q, {
+        get(target, prop, receiver) {
+            if (prop === 'then' || prop === 'catch' || prop === 'finally') return undefined;
+            const val = Reflect.get(target, prop, receiver);
+            return typeof val === 'function' ? val.bind(target) : val;
+        },
+    });
 }
 
 // Agrupa array por chave e soma um campo numérico
