@@ -1,4 +1,9 @@
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE = import.meta.env.VITE_API_URL || window.location.origin;
+
+function authHeader(): Record<string, string> {
+    const t = localStorage.getItem('crm_token');
+    return t ? { Authorization: `Bearer ${t}` } : {};
+}
 
 async function fetchJson<T>(path: string, params?: Record<string, string>): Promise<T> {
     const url = new URL(`${API_BASE}${path}`);
@@ -7,7 +12,7 @@ async function fetchJson<T>(path: string, params?: Record<string, string>): Prom
             if (value) url.searchParams.append(key, value);
         });
     }
-    const res = await fetch(url.toString());
+    const res = await fetch(url.toString(), { headers: authHeader() });
     if (!res.ok) throw new Error(`Erro ao buscar ${path}: ${res.statusText}`);
     return res.json();
 }
