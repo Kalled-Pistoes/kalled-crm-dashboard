@@ -441,37 +441,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!rep) return res.json([]);
             const meta = (rep as any).meta_mensal || 0;
 
+
             const vendasRep = await fetchAllPages(
-                supabase.from('vendas_representantes').select('data, valor_pedido').eq('representante_id', (rep as any).id)
+                supabase.from('vendas_representantes')
+                    .select('data, valor_pedido, cliente:cliente_id(nome)')
+                    .eq('representante_id', (rep as any).id)
             );
             const totaisMap: Record<string, number> = {};
+            const clientesMap: Record<string, Map<string, number>> = {};
             for (const r of vendasRep) {
                 if (mes && r.data.substring(5, 7) !== mes) continue;
                 const ano = r.data.substring(0, 4);
-                totaisMap[ano] = (totaisMap[ano] || 0) + (r.valor_pedido || 0);
+                totaisMap[ano] = (totaisMap[ano] || 0) + ((r as any).valor_pedido || 0);
+                const nomeCliente = (r as any).cliente?.nome || '';
+                if (nomeCliente) {
+                    if (!clientesMap[ano]) clientesMap[ano] = new Map();
+                    clientesMap[ano].set(nomeCliente, (clientesMap[ano].get(nomeCliente) || 0) + ((r as any).valor_pedido || 0));
+                }
             }
 
-            const { data: clientes } = await supabase.from('clientes').select('id, nome').eq('representante_id', (rep as any).id);
-            const cliIds = (clientes || []).map((c: any) => c.id);
-            const cliNomeMap: Record<string, string> = {};
-            for (const c of (clientes || [])) cliNomeMap[(c as any).id] = (c as any).nome;
-
-            const vendas = await fetchAllPages(
-                supabase.from('vendas').select('data, valor, cliente_id')
-                    .in('cliente_id', cliIds.length > 0 ? cliIds : ['00000000-0000-0000-0000-000000000000'])
-            );
-            const clientesMap: Record<string, Map<string, number>> = {};
-            for (const v of vendas) {
-                if (mes && v.data.substring(5, 7) !== mes) continue;
-                const ano = v.data.substring(0, 4);
-                const nomeCliente = cliNomeMap[v.cliente_id] || '';
-                if (!nomeCliente) continue;
-                if (!clientesMap[ano]) clientesMap[ano] = new Map();
-                clientesMap[ano].set(nomeCliente, (clientesMap[ano].get(nomeCliente) || 0) + (v.valor || 0));
-            }
-
-            const anos = new Set([...Object.keys(totaisMap), ...Object.keys(clientesMap)]);
-            return res.json(Array.from(anos).sort().map(ano => ({
+            return res.json(Object.keys(totaisMap).sort().map(ano => ({
                 ano,
                 total: totaisMap[ano] || 0,
                 meta,
