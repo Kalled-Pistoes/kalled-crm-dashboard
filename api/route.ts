@@ -444,16 +444,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const vendasRep = await fetchAllPages(
                 supabase.from('vendas_representantes')
-                    .select('data, valor_pedido, cliente:cliente_id(nome)')
+                    .select('data, valor_pedido, cliente_id')
                     .eq('representante_id', (rep as any).id)
             );
+
+            // Coleta IDs únicos de clientes e busca nomes
+            const clienteIds = [...new Set(vendasRep.map((r: any) => r.cliente_id).filter(Boolean))];
+            const cliNomeMap: Record<string, string> = {};
+            if (clienteIds.length > 0) {
+                const { data: cliData } = await supabase.from('clientes').select('id, nome').in('id', clienteIds);
+                for (const c of (cliData || [])) cliNomeMap[(c as any).id] = (c as any).nome;
+            }
+
             const totaisMap: Record<string, number> = {};
             const clientesMap: Record<string, Map<string, number>> = {};
             for (const r of vendasRep) {
                 if (mes && r.data.substring(5, 7) !== mes) continue;
                 const ano = r.data.substring(0, 4);
                 totaisMap[ano] = (totaisMap[ano] || 0) + ((r as any).valor_pedido || 0);
-                const nomeCliente = (r as any).cliente?.nome || '';
+                const nomeCliente = cliNomeMap[(r as any).cliente_id] || '';
                 if (nomeCliente) {
                     if (!clientesMap[ano]) clientesMap[ano] = new Map();
                     clientesMap[ano].set(nomeCliente, (clientesMap[ano].get(nomeCliente) || 0) + ((r as any).valor_pedido || 0));
@@ -470,6 +479,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     .sort((a, b) => b.total - a.total),
             })));
         }
+
 
         if (s0 === 'representantes' && s1 && s2 === 'visitas-por-cliente') {
             const user = requireAuth(req, res);
