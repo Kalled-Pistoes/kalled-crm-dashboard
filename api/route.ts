@@ -571,7 +571,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             };
 
             // ── parse Excel ──────────────────────────────────────────────
-            const wb = XLSX.read(Buffer.from(vendasB64, 'base64'), { type: 'buffer' });
+            const wb = XLSX.read(vendasB64, { type: 'base64' });
             const rawMetas     = getSheet(wb, 'Metas Representantes');
             const rawClientes  = getSheet(wb, 'Clientes');
             const rawCross     = getSheet(wb, 'Cross');
@@ -674,7 +674,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // ── catálogo (opcional) ───────────────────────────────────────
             let catalogoCount = 0;
             if (catalogoB64) {
-                const wbCat = XLSX.read(Buffer.from(catalogoB64, 'base64'), { type: 'buffer' });
+                const wbCat = XLSX.read(catalogoB64, { type: 'base64' });
                 const sheetCat = wbCat.Sheets[wbCat.SheetNames[0]];
                 const rawCat: any[] = XLSX.utils.sheet_to_json(sheetCat, { range: 1, raw: false, defval: null });
                 const catRows = rawCat.map((r:any) => {
