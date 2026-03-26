@@ -571,7 +571,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             };
 
             // ── parse Excel ──────────────────────────────────────────────
-            const wb = XLSX.read(vendasB64, { type: 'base64' });
+            const readXlsx = (b64: string): any => {
+                const attempts: Array<() => any> = [
+                    () => XLSX.read(b64, { type: 'base64' }),
+                    () => { const buf = Buffer.from(b64, 'base64'); return XLSX.read(new Uint8Array(buf), { type: 'array' }); },
+                    () => { const buf = Buffer.from(b64, 'base64'); return XLSX.read(buf.toString('binary'), { type: 'binary' }); },
+                ];
+                let lastErr: Error | null = null;
+                for (const fn of attempts) {
+                    try { return fn(); } catch (e: any) { lastErr = e; }
+                }
+                throw new Error(`Não foi possível ler o arquivo Excel. Certifique-se de que ele está FECHADO no Excel antes de fazer o upload. (Detalhe: ${lastErr?.message})`);
+            };
+            const wb = readXlsx(vendasB64);
             const rawMetas     = getSheet(wb, 'Metas Representantes');
             const rawClientes  = getSheet(wb, 'Clientes');
             const rawCross     = getSheet(wb, 'Cross');
@@ -674,7 +686,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // ── catálogo (opcional) ───────────────────────────────────────
             let catalogoCount = 0;
             if (catalogoB64) {
-                const wbCat = XLSX.read(catalogoB64, { type: 'base64' });
+                const wbCat = readXlsx(catalogoB64);
                 const sheetCat = wbCat.Sheets[wbCat.SheetNames[0]];
                 const rawCat: any[] = XLSX.utils.sheet_to_json(sheetCat, { range: 1, raw: false, defval: null });
                 const catRows = rawCat.map((r:any) => {
