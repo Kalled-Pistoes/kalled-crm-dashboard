@@ -127,17 +127,18 @@ async function main() {
         process.exit(1);
     }
 
-    // Leitura com retry — arquivos em rede podem falhar intermitentemente
-    const readExcel = (filePath: string, tentativas = 3): any => {
-        for (let i = 1; i <= tentativas; i++) {
-            try {
-                const buf = fs.readFileSync(filePath);
-                return XLSX.read(buf, { type: 'buffer' });
-            } catch (e: any) {
-                if (i === tentativas) throw e;
-                console.log(`   [Aviso] Tentativa ${i} falhou (${e.message}), tentando novamente...`);
-                const t = Date.now() + 800; while (Date.now() < t) {}
-            }
+    // Copia para temp local antes de ler — evita lock/cache do Windows em rede
+    const readExcel = (filePath: string): any => {
+        const { execSync } = require('child_process');
+        const os = require('os');
+        const tmpPath = path.join(os.tmpdir(), `kalled_xlsx_${Date.now()}.xlsx`);
+        try {
+            // cmd /c copy lida melhor com locks de rede do que fs.readFileSync
+            execSync(`cmd /c copy /Y "${filePath.replace(/\//g, '\\')}" "${tmpPath}"`, { stdio: 'ignore' });
+            const buf = fs.readFileSync(tmpPath);
+            return XLSX.read(buf, { type: 'buffer' });
+        } finally {
+            try { fs.unlinkSync(tmpPath); } catch {}
         }
     };
 
