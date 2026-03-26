@@ -443,30 +443,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 
             const vendasRep = await fetchAllPages(
-                supabase.from('vendas_representantes')
-                    .select('data, valor_pedido, cliente_id')
-                    .eq('representante_id', (rep as any).id)
+                supabase.from('vendas_representantes').select('data, valor_pedido').eq('representante_id', (rep as any).id)
             );
-
-            // Coleta IDs únicos de clientes e busca nomes
-            const clienteIds = [...new Set(vendasRep.map((r: any) => r.cliente_id).filter(Boolean))];
-            const cliNomeMap: Record<string, string> = {};
-            if (clienteIds.length > 0) {
-                const { data: cliData } = await supabase.from('clientes').select('id, nome').in('id', clienteIds);
-                for (const c of (cliData || [])) cliNomeMap[(c as any).id] = (c as any).nome;
-            }
-
             const totaisMap: Record<string, number> = {};
-            const clientesMap: Record<string, Map<string, number>> = {};
             for (const r of vendasRep) {
                 if (mes && r.data.substring(5, 7) !== mes) continue;
                 const ano = r.data.substring(0, 4);
-                totaisMap[ano] = (totaisMap[ano] || 0) + ((r as any).valor_pedido || 0);
-                const nomeCliente = cliNomeMap[(r as any).cliente_id] || '';
-                if (nomeCliente) {
-                    if (!clientesMap[ano]) clientesMap[ano] = new Map();
-                    clientesMap[ano].set(nomeCliente, (clientesMap[ano].get(nomeCliente) || 0) + ((r as any).valor_pedido || 0));
-                }
+                totaisMap[ano] = (totaisMap[ano] || 0) + (r.valor_pedido || 0);
+            }
+
+            // Clientes vêm da tabela vendas, mas apenas para anos com vendas em vendas_representantes
+            const { data: clientes } = await supabase.from('clientes').select('id, nome').eq('representante_id', (rep as any).id);
+            const cliIds = (clientes || []).map((c: any) => c.id);
+            const cliNomeMap: Record<string, string> = {};
+            for (const c of (clientes || [])) cliNomeMap[(c as any).id] = (c as any).nome;
+
+            const vendas = await fetchAllPages(
+                supabase.from('vendas').select('data, valor, cliente_id')
+                    .in('cliente_id', cliIds.length > 0 ? cliIds : ['00000000-0000-0000-0000-000000000000'])
+            );
+            const clientesMap: Record<string, Map<string, number>> = {};
+            for (const v of vendas) {
+                if (mes && v.data.substring(5, 7) !== mes) continue;
+                const ano = v.data.substring(0, 4);
+                if (!totaisMap[ano]) continue;
+                const nomeCliente = cliNomeMap[v.cliente_id] || '';
+                if (!nomeCliente) continue;
+                if (!clientesMap[ano]) clientesMap[ano] = new Map();
+                clientesMap[ano].set(nomeCliente, (clientesMap[ano].get(nomeCliente) || 0) + (v.valor || 0));
             }
 
             return res.json(Object.keys(totaisMap).sort().map(ano => ({
@@ -479,7 +483,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     .sort((a, b) => b.total - a.total),
             })));
         }
-
 
         if (s0 === 'representantes' && s1 && s2 === 'visitas-por-cliente') {
             const user = requireAuth(req, res);
