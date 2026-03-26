@@ -127,8 +127,22 @@ async function main() {
         process.exit(1);
     }
 
+    // Leitura com retry — arquivos em rede podem falhar intermitentemente
+    const readExcel = (filePath: string, tentativas = 3): any => {
+        for (let i = 1; i <= tentativas; i++) {
+            try {
+                const buf = fs.readFileSync(filePath);
+                return XLSX.read(buf, { type: 'buffer' });
+            } catch (e: any) {
+                if (i === tentativas) throw e;
+                console.log(`   [Aviso] Tentativa ${i} falhou (${e.message}), tentando novamente...`);
+                const t = Date.now() + 800; while (Date.now() < t) {}
+            }
+        }
+    };
+
     console.log('[1/6] Lendo Excel...');
-    const wb = XLSX.readFile(EXCEL_PATH);
+    const wb = readExcel(EXCEL_PATH);
 
     const rawMetas     = getSheet(wb, 'Metas Representantes');
     const rawClientes  = getSheet(wb, 'Clientes');
@@ -322,7 +336,7 @@ async function main() {
     let catalogoCount = 0;
     if (fs.existsSync(CATALOG_PATH)) {
         console.log(`   Lendo: ${CATALOG_PATH}`);
-        const wbCatalog = XLSX.readFile(CATALOG_PATH);
+        const wbCatalog = readExcel(CATALOG_PATH);
         const sheetCatalog = wbCatalog.Sheets[wbCatalog.SheetNames[0]];
         // A planilha tem 2 linhas de cabeçalho: linha 0 = grupos (PISTÃO/ANÉL/PINO), linha 1 = colunas reais
         const rawCatalog: any[] = XLSX.utils.sheet_to_json(sheetCatalog, { range: 1, raw: false, defval: null });
