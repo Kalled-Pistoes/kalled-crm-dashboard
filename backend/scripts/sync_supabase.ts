@@ -287,6 +287,7 @@ async function main() {
                 data,
                 representante_id: repMap.get(vendedor) || null,
                 cliente_id:       findClienteId(cliente),
+                cliente_nome:     cliente || null,
                 valor_pedido:     parseCurrency(getRowValue(row, 'Valor do Pedido', ' Valor do Pedido ', 'Valor', 'valor')) || null,
             };
         })
