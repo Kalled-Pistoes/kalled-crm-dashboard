@@ -9,6 +9,7 @@ import {
     LogOut,
     UserCog,
     User,
+    Database,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -56,6 +57,7 @@ export default function Layout() {
         { to: '/representantes', icon: UserCheck, label: 'Representantes' },
         { to: '/visitas', icon: MapPin, label: 'Visitas' },
         ...(isAdmin ? [{ to: '/usuarios', icon: UserCog, label: 'Usuários' }] : []),
+        ...(isAdmin ? [{ to: '/sync', icon: Database, label: 'Sincronizar' }] : []),
     ];
 
     return (

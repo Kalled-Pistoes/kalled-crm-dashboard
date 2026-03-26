@@ -5,6 +5,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import Catalogo from './components/Catalogo';
 import LoginPage from './components/LoginPage';
+import SyncPage from './components/SyncPage';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Clientes = lazy(() => import('./pages/Clientes'));
@@ -32,6 +33,7 @@ export default function App() {
               <Route path="/representantes" element={<Suspense fallback={fallback}><Representantes /></Suspense>} />
               <Route path="/visitas" element={<Suspense fallback={fallback}><Visitas /></Suspense>} />
               <Route path="/usuarios" element={<Suspense fallback={fallback}><GerenciarUsuarios /></Suspense>} />
+              <Route path="/sync" element={<SyncPage />} />
             </Route>
           </Route>
         </Routes>

@@ -127,23 +127,8 @@ async function main() {
         process.exit(1);
     }
 
-    // Copia para temp local antes de ler — evita lock/cache do Windows em rede
-    const readExcel = (filePath: string): any => {
-        const { execSync } = require('child_process');
-        const os = require('os');
-        const tmpPath = path.join(os.tmpdir(), `kalled_xlsx_${Date.now()}.xlsx`);
-        try {
-            // cmd /c copy lida melhor com locks de rede do que fs.readFileSync
-            execSync(`cmd /c copy /Y "${filePath.replace(/\//g, '\\')}" "${tmpPath}"`, { stdio: 'ignore' });
-            const buf = fs.readFileSync(tmpPath);
-            return XLSX.read(buf, { type: 'buffer' });
-        } finally {
-            try { fs.unlinkSync(tmpPath); } catch {}
-        }
-    };
-
     console.log('[1/6] Lendo Excel...');
-    const wb = readExcel(EXCEL_PATH);
+    const wb = XLSX.readFile(EXCEL_PATH);
 
     const rawMetas     = getSheet(wb, 'Metas Representantes');
     const rawClientes  = getSheet(wb, 'Clientes');
@@ -209,15 +194,6 @@ async function main() {
     const { data: clientesData } = await supabase.from('clientes').select('id, nome');
     const clienteMap = new Map<string, string>((clientesData || []).map(c => [c.nome, c.id]));
 
-    // Mapa normalizado para matching tolerante (ignora acentos, pontuação, case)
-    const normNome = (s: string) => s.toUpperCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^A-Z0-9]/g, ' ').replace(/\s+/g, ' ').trim();
-    const clienteMapNorm = new Map<string, string>();
-    for (const [nome, id] of clienteMap) clienteMapNorm.set(normNome(nome), id);
-    const findClienteId = (nome: string) => clienteMap.get(nome) || clienteMapNorm.get(normNome(nome)) || null;
-
-
     // ── 3. PRODUTOS (Cross) ────────────────────────────────────────────────────
     console.log('\n[4/6] Sincronizando produtos...');
     const produtosToUpsert = rawCross
@@ -270,7 +246,7 @@ async function main() {
             const sku     = String(getRowValue(row, 'Código (SKU)', 'Codigo', 'codigo', 'PN', 'pn') || '').trim();
             if (!data || !cliente) return null;
             // Descobre representante via cliente
-            const clienteId = findClienteId(cliente);
+            const clienteId = clienteMap.get(cliente);
             const repNome   = rawClientes.find((c: any) =>
                 String(getRowValue(c, 'Cliente', 'cliente') || '').trim() === cliente
             );
@@ -301,8 +277,7 @@ async function main() {
             return {
                 data,
                 representante_id: repMap.get(vendedor) || null,
-                cliente_id:       findClienteId(cliente),
-                cliente_nome:     cliente || null,
+                cliente_id:       clienteMap.get(cliente) || null,
                 valor_pedido:     parseCurrency(getRowValue(row, 'Valor do Pedido', ' Valor do Pedido ', 'Valor', 'valor')) || null,
             };
         })
@@ -322,7 +297,7 @@ async function main() {
                 data,
                 tipo_visita:      String(getRowValue(row, 'Tipo de Visita', 'tipo de visita') || '').trim() || null,
                 representante_id: repMap.get(rep) || null,
-                cliente_id:       findClienteId(cliente),
+                cliente_id:       clienteMap.get(cliente) || null,
                 custo_visita:     parseCurrency(getRowValue(row, 'Custo da Visita (R$)', 'Custo da Visita', 'custo da visita (r$)', 'custo da visita')) || 0,
             };
         })
@@ -337,7 +312,7 @@ async function main() {
     let catalogoCount = 0;
     if (fs.existsSync(CATALOG_PATH)) {
         console.log(`   Lendo: ${CATALOG_PATH}`);
-        const wbCatalog = readExcel(CATALOG_PATH);
+        const wbCatalog = XLSX.readFile(CATALOG_PATH);
         const sheetCatalog = wbCatalog.Sheets[wbCatalog.SheetNames[0]];
         // A planilha tem 2 linhas de cabeçalho: linha 0 = grupos (PISTÃO/ANÉL/PINO), linha 1 = colunas reais
         const rawCatalog: any[] = XLSX.utils.sheet_to_json(sheetCatalog, { range: 1, raw: false, defval: null });

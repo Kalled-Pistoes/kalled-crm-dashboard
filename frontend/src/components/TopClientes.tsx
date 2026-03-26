@@ -27,7 +27,7 @@ export default function TopClientes({ clientes }: TopClientesProps) {
                                 <td className="py-3 px-4 font-bold text-slate-500 w-12 text-center">{index + 1}</td>
                                 <td className="py-3 px-2 font-bold text-slate-200 leading-tight">
                                     <div className="flex flex-col">
-                                        <span className="truncate max-w-[150px]" title={c.nome}>{c.nome}</span>
+                                        <span className="truncate max-w-[150px]">{c.nome}</span>
                                     </div>
                                 </td>
                                 <td className="py-3 px-2 text-center">

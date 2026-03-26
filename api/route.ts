@@ -1,9 +1,15 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import XLSX from 'xlsx';
 import { supabase } from './_lib/supabase';
 import { JWT_SECRET, requireAuth, requireAdmin, getRepresentanteId } from './_lib/auth';
 import { applyDateFilter, applyVendasFilters, fetchAllPages, groupBySum, toYearMonth, toYear } from './_lib/filters';
+
+export const config = {
+    api: { bodyParser: { sizeLimit: '20mb' } },
+    maxDuration: 60,
+};
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Parse path from URL: /api/auth/login → ['auth', 'login']
@@ -512,6 +518,178 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 representante: r.representante?.nome ?? '', cliente: r.cliente?.nome ?? '',
                 custo: r.custo_visita || 0,
             })));
+        }
+
+        // ── sync ────────────────────────────────────────────────────────────
+        if (s0 === 'sync') {
+            if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+            const user = requireAuth(req, res);
+            if (!user) return;
+            if (!requireAdmin(user, res)) return;
+
+            const { vendas: vendasB64, catalogo: catalogoB64 } = req.body || {};
+            if (!vendasB64) return res.status(400).json({ error: 'Campo "vendas" com o arquivo Excel em base64 é obrigatório' });
+
+            // ── helpers ──────────────────────────────────────────────────
+            const parseCurrency = (v: any): number => {
+                if (typeof v === 'number') return v;
+                if (!v) return 0;
+                const n = parseFloat(String(v).replace('R$', '').trim().replace(/\./g, '').replace(',', '.'));
+                return isNaN(n) ? 0 : n;
+            };
+            const parseDate = (v: any): string => {
+                if (!v) return '';
+                if (typeof v === 'number') return new Date(Math.round((v - 25569) * 86400 * 1000)).toISOString().split('T')[0];
+                const s = String(v).trim();
+                const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                if (m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+                const d = new Date(s); return isNaN(d.getTime()) ? s : d.toISOString().split('T')[0];
+            };
+            const getVal = (row: any, ...keys: string[]): any => {
+                for (const k of keys) {
+                    if (row[k] !== undefined) return row[k];
+                    const lk = k.toLowerCase();
+                    for (const rk in row) if (rk.toLowerCase() === lk) return row[rk];
+                }
+            };
+            const getSheet = (wb: any, name: string): any[] => {
+                const s = wb.Sheets[name]; return s ? XLSX.utils.sheet_to_json(s) : [];
+            };
+            const upsertBatch = async (table: string, rows: any[], col: string) => {
+                for (let i = 0; i < rows.length; i += 500) {
+                    const { error } = await supabase.from(table).upsert(rows.slice(i, i+500), { onConflict: col });
+                    if (error) throw new Error(`[${table}] ${error.message}`);
+                }
+                return rows.length;
+            };
+            const insertBatch = async (table: string, rows: any[]) => {
+                for (let i = 0; i < rows.length; i += 500) {
+                    const { error } = await supabase.from(table).insert(rows.slice(i, i+500));
+                    if (error) throw new Error(`[${table}] ${error.message}`);
+                }
+                return rows.length;
+            };
+
+            // ── parse Excel ──────────────────────────────────────────────
+            const wb = XLSX.read(Buffer.from(vendasB64, 'base64'), { type: 'buffer' });
+            const rawMetas     = getSheet(wb, 'Metas Representantes');
+            const rawClientes  = getSheet(wb, 'Clientes');
+            const rawCross     = getSheet(wb, 'Cross');
+            const rawVendas    = getSheet(wb, 'Vendas');
+            const rawVendasRep = getSheet(wb, 'Vendas Representantes');
+            const rawVisitas   = getSheet(wb, 'Visitas Tecnicas');
+
+            // ── representantes ───────────────────────────────────────────
+            const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const repEstadoMap = new Map<string, string>();
+            for (const r of rawMetas) {
+                const n = String(getVal(r,'Vendedor','vendedor')||'').trim();
+                const e = String(getVal(r,'Estado','estado')||'').trim();
+                if (n && e) repEstadoMap.set(normalize(n), e);
+            }
+            const repsRows = rawMetas.map((r:any) => ({
+                nome: String(getVal(r,'Vendedor','vendedor')||'').trim(),
+                estado: String(getVal(r,'Estado','estado')||'').trim()||null,
+                meta_mensal: parseCurrency(getVal(r,'Meta','meta'))||null,
+                updated_at: new Date().toISOString(),
+            })).filter((r:any) => r.nome);
+            const repsCount = await upsertBatch('representantes', repsRows, 'nome');
+            const { data: repsData } = await supabase.from('representantes').select('id, nome');
+            const repMap = new Map<string,string>((repsData||[]).map((r:any)=>[r.nome,r.id]));
+
+            // ── clientes ─────────────────────────────────────────────────
+            const cliRows = rawClientes.map((r:any) => {
+                const nome = String(getVal(r,'Cliente','cliente','Razão Social')||'').trim();
+                const repNome = String(getVal(r,'Representante','representante')||'').trim();
+                return {
+                    nome, uf: repEstadoMap.get(normalize(repNome))||null,
+                    status:    String(getVal(r,'Status','status')||'').trim()||null,
+                    grupo:     String(getVal(r,'Grupo','grupo')||'').trim()||null,
+                    desconto:  String(getVal(r,'Desconto','desconto')||'').trim()||null,
+                    pagamento: String(getVal(r,'Pagamento','pagamento')||'').trim()||null,
+                    prazo:     String(getVal(r,'Prazo','prazo')||'').trim()||null,
+                    representante_id: repMap.get(repNome)||null,
+                    updated_at: new Date().toISOString(),
+                };
+            }).filter((c:any)=>c.nome);
+            const cliCount = await upsertBatch('clientes', cliRows, 'nome');
+            const { data: cliData } = await supabase.from('clientes').select('id, nome');
+            const cliMap = new Map<string,string>((cliData||[]).map((c:any)=>[c.nome,c.id]));
+            const normNome = (s:string) => s.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]/g,' ').replace(/\s+/g,' ').trim();
+            const cliMapNorm = new Map<string,string>();
+            for (const [n,id] of cliMap) cliMapNorm.set(normNome(n), id);
+            const findCliId = (n:string) => cliMap.get(n) || cliMapNorm.get(normNome(n)) || null;
+
+            // ── produtos ─────────────────────────────────────────────────
+            const prodRows = rawCross.map((r:any) => {
+                const pn = String(getVal(r,'PN','pn')||'').trim();
+                if (!pn) return null;
+                const toRef = (v:any) => v && String(v).trim()!=='N/A' && String(v).trim()!=='' ? String(v).trim() : null;
+                const rl = toRef(getVal(r,'Metal Leve')), rs = toRef(getVal(r,'Sulloy')), rk = toRef(getVal(r,'KS')), ra = toRef(getVal(r,'Apex'));
+                const linhas = [...(rl?['Metal Leve']:[]), ...(rs?['Sulloy']:[]), ...(rk?['KS']:[]), ...(ra?['Apex']:[])];
+                return { pn, descricao: String(getVal(r,'Descrição','Descricao','descricao')||'').trim()||null, linhas, ref_metal_leve:rl, ref_sulloy:rs, ref_ks:rk, ref_apex:ra };
+            }).filter(Boolean);
+            const prodCount = await upsertBatch('produtos', prodRows as any[], 'pn');
+            const { data: prodData } = await supabase.from('produtos').select('id, pn');
+            const prodMap = new Map<string,string>((prodData||[]).map((p:any)=>[p.pn,p.id]));
+
+            // ── truncate transacionais ────────────────────────────────────
+            for (const t of ['vendas','vendas_representantes','visitas_tecnicas']) {
+                const { error } = await supabase.from(t).delete().neq('id','00000000-0000-0000-0000-000000000000');
+                if (error) throw new Error(`Truncate ${t}: ${error.message}`);
+            }
+
+            // ── vendas ────────────────────────────────────────────────────
+            const vendasRows = rawVendas.map((r:any) => {
+                const data = parseDate(getVal(r,'Data','data'));
+                const cliente = String(getVal(r,'Cliente','cliente')||'').trim();
+                const sku = String(getVal(r,'Código (SKU)','Codigo','codigo','PN','pn')||'').trim();
+                if (!data||!cliente) return null;
+                const repNome = rawClientes.find((c:any)=>String(getVal(c,'Cliente','cliente')||'').trim()===cliente);
+                const repId = repNome ? repMap.get(String(getVal(repNome,'Representante','representante')||'').trim()) : undefined;
+                return { data, cliente_id: findCliId(cliente), produto_id: prodMap.get(sku)||null, quantidade: parseCurrency(getVal(r,'Quantidade','quantidade'))||null, valor: parseCurrency(getVal(r,'Valor','valor'))||null, representante_id: repId||null };
+            }).filter(Boolean);
+            const vendasCount = await insertBatch('vendas', vendasRows as any[]);
+
+            // ── vendas_representantes ─────────────────────────────────────
+            const vrRows = rawVendasRep.map((r:any) => {
+                const data = parseDate(getVal(r,'Data','data'));
+                const vendedor = String(getVal(r,'Vendedor','vendedor')||'').trim();
+                const cliente = String(getVal(r,'Cliente','cliente')||'').trim();
+                if (!data||!vendedor) return null;
+                return { data, representante_id: repMap.get(vendedor)||null, cliente_id: findCliId(cliente), cliente_nome: cliente||null, valor_pedido: parseCurrency(getVal(r,'Valor do Pedido',' Valor do Pedido ','Valor','valor'))||null };
+            }).filter(Boolean);
+            const vrCount = await insertBatch('vendas_representantes', vrRows as any[]);
+
+            // ── visitas ───────────────────────────────────────────────────
+            const visitasRows = rawVisitas.map((r:any) => {
+                const data = parseDate(getVal(r,'Data','data'));
+                const rep = String(getVal(r,'Representante','representante','Vendedor','vendedor')||'').trim();
+                const cliente = String(getVal(r,'Cliente','cliente')||'').trim();
+                if (!data||!rep) return null;
+                return { data, tipo_visita: String(getVal(r,'Tipo de Visita','tipo de visita')||'').trim()||null, representante_id: repMap.get(rep)||null, cliente_id: findCliId(cliente), custo_visita: parseCurrency(getVal(r,'Custo da Visita (R$)','Custo da Visita','custo da visita (r$)','custo da visita'))||0 };
+            }).filter(Boolean);
+            const visitasCount = await insertBatch('visitas_tecnicas', visitasRows as any[]);
+
+            // ── catálogo (opcional) ───────────────────────────────────────
+            let catalogoCount = 0;
+            if (catalogoB64) {
+                const wbCat = XLSX.read(Buffer.from(catalogoB64, 'base64'), { type: 'buffer' });
+                const sheetCat = wbCat.Sheets[wbCat.SheetNames[0]];
+                const rawCat: any[] = XLSX.utils.sheet_to_json(sheetCat, { range: 1, raw: false, defval: null });
+                const catRows = rawCat.map((r:any) => {
+                    const cod = String(r['CÓD']||r['COD']||r['Cód']||'').trim();
+                    if (!cod) return null;
+                    const cl = (v:any) => v ? String(v).trim().replace(/\r\n/g,' / ').replace(/\n/g,' / ')||null : null;
+                    const cn = (v:any) => { const n = parseFloat(v); return isNaN(n)?null:n; };
+                    return { cod, pa: cl(r['PA']), descricao: cl(r['DESCRIÇÃO']), grupo: cl(r['Grupo']||r['GRUPO']), montadora: cl(r['MONTADORA']), veiculo: cl(r['VEICULO']||r['VEÍCULO']), ano_aplicacao: cl(r['ANO DE APLICAÇÃO']), motor: cl(r['MOTOR']), sobremedida: cl(r['SOBREMEDIDA']), qtd_pistoes: cn(r['QUANTIDADE DE PISTÕES'])!==null?Math.round(cn(r['QUANTIDADE DE PISTÕES'])!):null, diametro_cilindro: cn(r['DIAMETRO DO CILINDRO']), ref_metal_leve_sulloy: cl(r['CÓD REF METAL LEVE / SULOY']||r['CÓD REF METAL LEVE / SULLOY']), ref_anel_kalled: cl(r['REF ANEL KALLED']), updated_at: new Date().toISOString() };
+                }).filter(Boolean);
+                const { error: delCat } = await supabase.from('catalogo_produtos').delete().neq('id','00000000-0000-0000-0000-000000000000');
+                if (delCat) throw new Error(`Truncate catalogo_produtos: ${delCat.message}`);
+                catalogoCount = await insertBatch('catalogo_produtos', catRows as any[]);
+            }
+
+            return res.json({ success: true, counts: { representantes: repsCount, clientes: cliCount, produtos: prodCount, vendas: vendasCount, vendas_representantes: vrCount, visitas: visitasCount, catalogo: catalogoCount } });
         }
 
         return res.status(404).json({ error: 'Rota não encontrada' });
