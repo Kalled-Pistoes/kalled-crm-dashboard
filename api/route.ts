@@ -571,17 +571,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             };
 
             // ── parse Excel ──────────────────────────────────────────────
+            // Alguns xlsx usam "data descriptor": cabeçalho local tem compressedSize=0
+            // e o tamanho real fica após os dados (PK\x07\x08). O xlsx não lida com isso.
+            // Correção: ler o diretório central do ZIP (sempre correto) e patchear os headers.
             const readXlsx = (b64: string): any => {
-                const attempts: Array<() => any> = [
-                    () => XLSX.read(b64, { type: 'base64' }),
-                    () => { const buf = Buffer.from(b64, 'base64'); return XLSX.read(new Uint8Array(buf), { type: 'array' }); },
-                    () => { const buf = Buffer.from(b64, 'base64'); return XLSX.read(buf.toString('binary'), { type: 'binary' }); },
-                ];
-                let lastErr: Error | null = null;
-                for (const fn of attempts) {
-                    try { return fn(); } catch (e: any) { lastErr = e; }
-                }
-                throw new Error(`Não foi possível ler o arquivo Excel. Certifique-se de que ele está FECHADO no Excel antes de fazer o upload. (Detalhe: ${lastErr?.message})`);
+                const raw = Buffer.from(b64, 'base64');
+                const fixZip = (buf: Buffer): Buffer => {
+                    let eocd = -1;
+                    for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65558); i--) {
+                        if (buf.readUInt32LE(i) === 0x06054B50) { eocd = i; break; }
+                    }
+                    if (eocd === -1) return buf;
+                    const cdOff  = buf.readUInt32LE(eocd + 16);
+                    const cdSize = buf.readUInt32LE(eocd + 12);
+                    const out = Buffer.from(buf);
+                    let pos = cdOff;
+                    while (pos + 46 <= cdOff + cdSize) {
+                        if (out.readUInt32LE(pos) !== 0x02014B50) break;
+                        const compSz   = out.readUInt32LE(pos + 20);
+                        const uncompSz = out.readUInt32LE(pos + 24);
+                        const fnLen    = out.readUInt16LE(pos + 28);
+                        const exLen    = out.readUInt16LE(pos + 30);
+                        const cmLen    = out.readUInt16LE(pos + 32);
+                        const localOff = out.readUInt32LE(pos + 42);
+                        if (localOff + 30 < out.length && out.readUInt32LE(localOff) === 0x04034B50) {
+                            if (out.readUInt32LE(localOff + 18) === 0 && compSz > 0) {
+                                out.writeUInt32LE(compSz,   localOff + 18);
+                                out.writeUInt32LE(uncompSz, localOff + 22);
+                            }
+                        }
+                        pos += 46 + fnLen + exLen + cmLen;
+                    }
+                    return out;
+                };
+                const fixed = fixZip(raw);
+                try { return XLSX.read(new Uint8Array(fixed), { type: 'array' }); }
+                catch { return XLSX.read(fixed.toString('binary'), { type: 'binary' }); }
             };
             const wb = readXlsx(vendasB64);
             const rawMetas     = getSheet(wb, 'Metas Representantes');
