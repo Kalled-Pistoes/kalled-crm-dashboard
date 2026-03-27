@@ -576,9 +576,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             // no header local). JSZip lida corretamente; extraímos tudo e re-zipamos limpo.
             const readXlsx = async (b64: string): Promise<any> => {
                 const raw = Buffer.from(b64, 'base64');
+                let errDirect = '';
                 try {
                     return XLSX.read(new Uint8Array(raw), { type: 'array' });
-                } catch {
+                } catch (e: any) { errDirect = e.message; }
+                let errJszip = '';
+                try {
                     const jz = await JSZip.loadAsync(raw);
                     const clean = new JSZip();
                     await Promise.all(Object.keys(jz.files).map(async name => {
@@ -588,7 +591,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     }));
                     const buf = await clean.generateAsync({ type: 'uint8array' });
                     return XLSX.read(buf, { type: 'array' });
-                }
+                } catch (e: any) { errJszip = e.message; }
+                throw new Error(`Falha ao ler Excel (${raw.length} bytes). Direto: "${errDirect}" | JSZip: "${errJszip}"`);
             };
             const wb = await readXlsx(vendasB64);
             const rawMetas     = getSheet(wb, 'Metas Representantes');
