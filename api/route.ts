@@ -572,15 +572,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             };
 
             // ── parse Excel ──────────────────────────────────────────────
-            // xlsx não lida com arquivos que usam "data descriptor" no ZIP (compressedSize=0
-            // no header local). JSZip lida corretamente; extraímos tudo e re-zipamos limpo.
+            // Problema: xlsx tem ZIP com "data descriptor" (compressedSize=0 no header local)
+            // E o EOCD está corrompido/ausente. Solução: varrer headers locais manualmente,
+            // localizar o data descriptor real via verificação matemática e patchear o buffer.
             const readXlsx = async (b64: string): Promise<any> => {
                 const raw = Buffer.from(b64, 'base64');
-                let errDirect = '';
-                try {
-                    return XLSX.read(new Uint8Array(raw), { type: 'array' });
-                } catch (e: any) { errDirect = e.message; }
-                let errJszip = '';
+
+                // Tentativa 1: leitura direta
+                try { return XLSX.read(new Uint8Array(raw), { type: 'array' }); } catch {}
+
+                // Tentativa 2: patchear headers locais com data descriptors reais
+                const fixBuf = Buffer.from(raw);
+                let pos = 0;
+                while (pos + 30 <= fixBuf.length) {
+                    if (fixBuf.readUInt32LE(pos) !== 0x04034B50) { pos++; continue; }
+                    const fnLen = fixBuf.readUInt16LE(pos + 26);
+                    const exLen = fixBuf.readUInt16LE(pos + 28);
+                    const dataStart = pos + 30 + fnLen + exLen;
+                    const localCompSz = fixBuf.readUInt32LE(pos + 18);
+                    if (localCompSz === 0) {
+                        // Busca data descriptor PK\x07\x08; verifica: (i - dataStart) == compSz no descriptor
+                        let fixed = false;
+                        for (let i = dataStart + 4; i + 16 <= fixBuf.length; i++) {
+                            if (fixBuf.readUInt32LE(i) === 0x08074B50) {
+                                const ddCompSz   = fixBuf.readUInt32LE(i + 8);
+                                const ddUncompSz = fixBuf.readUInt32LE(i + 12);
+                                if (i - dataStart === ddCompSz) {
+                                    fixBuf.writeUInt32LE(ddCompSz,   pos + 18);
+                                    fixBuf.writeUInt32LE(ddUncompSz, pos + 22);
+                                    pos = i + 16; fixed = true; break;
+                                }
+                            }
+                        }
+                        if (!fixed) { pos = dataStart; }
+                    } else {
+                        pos = dataStart + localCompSz;
+                        if (pos + 4 <= fixBuf.length && fixBuf.readUInt32LE(pos) === 0x08074B50) pos += 16;
+                    }
+                }
+                try { return XLSX.read(new Uint8Array(fixBuf), { type: 'array' }); } catch {}
+
+                // Tentativa 3: JSZip re-zip (funciona se EOCD estiver presente)
+                let errFinal = 'todas as tentativas falharam';
                 try {
                     const jz = await JSZip.loadAsync(raw);
                     const clean = new JSZip();
@@ -589,11 +622,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         if (f.dir) { clean.folder(name); }
                         else { clean.file(name, await f.async('uint8array'), { compression: 'DEFLATE' }); }
                     }));
-                    const buf = await clean.generateAsync({ type: 'uint8array' });
-                    return XLSX.read(buf, { type: 'array' });
-                } catch (e: any) { errJszip = e.message; }
-                throw new Error(`Falha ao ler Excel (${raw.length} bytes). Direto: "${errDirect}" | JSZip: "${errJszip}"`);
+                    return XLSX.read(await clean.generateAsync({ type: 'uint8array' }), { type: 'array' });
+                } catch (e: any) { errFinal = e.message; }
+
+                throw new Error(`Não foi possível ler o arquivo Excel (${raw.length} bytes): ${errFinal}. Tente abrir no Excel e fazer "Salvar Como" para gerar uma cópia limpa.`);
             };
+            // ── preview (não salva nada, apenas mostra o que foi lido) ───────
+            if (s1 === 'preview') {
+                const wbPrev = await readXlsx(vendasB64);
+                const preview: Record<string, any[]> = {};
+                for (const sheet of ['Metas Representantes','Clientes','Cross','Vendas','Vendas Representantes','Visitas Tecnicas']) {
+                    preview[sheet] = getSheet(wbPrev, sheet).slice(0, 5);
+                }
+                const counts: Record<string, number> = {};
+                for (const sheet of Object.keys(preview)) counts[sheet] = getSheet(wbPrev, sheet).length;
+                return res.json({ sheets: Object.keys(wbPrev.Sheets), counts, preview });
+            }
+
             const wb = await readXlsx(vendasB64);
             const rawMetas     = getSheet(wb, 'Metas Representantes');
             const rawClientes  = getSheet(wb, 'Clientes');
