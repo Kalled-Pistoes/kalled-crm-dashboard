@@ -1,4 +1,4 @@
-import { useSearchParams, NavLink, useLocation, Outlet } from 'react-router-dom';
+﻿import { useSearchParams, NavLink, useLocation, Outlet } from 'react-router-dom';
 import {
     LayoutDashboard,
     Users,
@@ -20,6 +20,7 @@ export default function Layout() {
 
     const isClientesPage = pathname === '/clientes';
     const isRepresentantesPage = pathname === '/representantes';
+    const isSyncPage = pathname === '/sync';
 
     const currentAno = searchParams.get('ano') || '2024';
     const currentMes = searchParams.get('mes') || '';
@@ -141,7 +142,7 @@ export default function Layout() {
             {/* Filter Sub-header */}
             <div className="bg-pbi-navy/40 backdrop-blur-sm text-white flex-shrink-0 text-xs shadow-sm border-b border-white/5 z-10 overflow-x-auto">
                 <div className="flex items-center justify-end px-3 sm:px-6 gap-3 sm:gap-6 py-2 min-w-max sm:min-w-0 sm:w-full">
-                    {!isClientesPage && (
+                    {!isClientesPage && !isSyncPage && (
                         <>
                             {!isRepresentantesPage && (
                                 <div className="flex items-center gap-2">

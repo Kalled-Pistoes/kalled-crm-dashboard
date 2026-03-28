@@ -9,6 +9,7 @@ import { dirname } from 'path';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
+import * as os from 'os';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -133,9 +134,18 @@ function loadWorkbook(): XLSX.WorkBook {
     const now = Date.now();
     if (_cachedWb && (now - _cacheTime) < CACHE_TTL) return _cachedWb;
     if (!fs.existsSync(EXCEL_PATH)) throw new Error(`Arquivo não encontrado: ${EXCEL_PATH}`);
-    _cachedWb = XLSX.readFile(EXCEL_PATH);
-    _cacheTime = now;
-    return _cachedWb;
+
+    // Copia para temp antes de ler — evita falha quando o Excel está aberto (lock Windows)
+    const tmpPath = path.join(os.tmpdir(), `crm_wb_${Date.now()}.xlsx`);
+    try {
+        fs.copyFileSync(EXCEL_PATH, tmpPath);
+        _cachedWb = XLSX.readFile(tmpPath);
+        _cacheTime = now;
+    } finally {
+        try { fs.unlinkSync(tmpPath); } catch {}
+    }
+
+    return _cachedWb!;
 }
 
 function getSheet<T = any>(wb: XLSX.WorkBook, sheetName: string): T[] {
