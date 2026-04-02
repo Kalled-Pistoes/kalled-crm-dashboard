@@ -917,19 +917,31 @@ fastify.get('/api/representantes/:nome/clientes-periodo', async (request, reply)
             }
         });
 
-        const rawVendas = getSheet(wb, 'Vendas');
-        const clientesComVenda = new Set<string>();
-        rawVendas.forEach((row: any) => {
-            const cli = getRowValue(row, 'Cliente', 'cliente');
-            if (!cli || !repClientesNorm.has(normalizeName(String(cli)))) return;
+        // Fonte correta: Vendas Representantes (filtrada por Vendedor = este rep)
+        const rawVendasReps = getSheet(wb, 'Vendas Representantes');
+        const clientesAtivosNorm = new Set<string>();
+        rawVendasReps.forEach((row: any) => {
+            const vendedor = getRowValue(row, 'Vendedor', 'vendedor');
+            if (!vendedor || normalizeName(vendedor) !== normNome) return;
             const dateStr = parseDate(getRowValue(row, 'Data', 'data'));
             if (!dateStr) return;
             if (query.mes && !dateStr.startsWith(query.mes)) return;
             if (!query.mes && query.ano && !dateStr.startsWith(query.ano)) return;
-            clientesComVenda.add(normalizeName(String(cli)));
+            const cli = getRowValue(row, 'Cliente', 'cliente');
+            if (cli) clientesAtivosNorm.add(normalizeName(String(cli)));
         });
 
-        return Array.from(clientesComVenda).map(norm => clienteNomeMap[norm]).filter(Boolean);
+        // Tenta mapear para o nome exibido na aba Clientes; se não encontrar, retorna o nome da VendasReps
+        const rawVendas = getSheet(wb, 'Vendas');
+        const vendasNomeMap: Record<string, string> = {};
+        rawVendas.forEach((row: any) => {
+            const cli = getRowValue(row, 'Cliente', 'cliente');
+            if (cli) vendasNomeMap[normalizeName(String(cli))] = String(cli).trim();
+        });
+
+        return Array.from(clientesAtivosNorm).map(norm =>
+            clienteNomeMap[norm] ?? vendasNomeMap[norm] ?? null
+        ).filter(Boolean);
     } catch (e: any) { reply.status(500).send({ error: e.message }); }
 });
 
