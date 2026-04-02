@@ -180,6 +180,7 @@ export const api = {
     getRepresentanteClientes: (nome: string) => fetchJson<RepresentanteCliente[]>(`/api/representantes/${encodeURIComponent(nome)}/clientes`),
     getRepresentanteVisitasPorCliente: (nome: string) => fetchJson<RepresentanteVisitaCliente[]>(`/api/representantes/${encodeURIComponent(nome)}/visitas-por-cliente`),
     getRepresentanteComparativoMes: (nome: string, mes: string) => fetchJson<ComparativoAnoData[]>(`/api/representantes/${encodeURIComponent(nome)}/comparativo-mes?mes=${mes}`),
+    getRepresentanteClientesPeriodo: (nome: string, params: { mes?: string; ano?: string }) => fetchJson<string[]>(`/api/representantes/${encodeURIComponent(nome)}/clientes-periodo`, params as any),
     getVisitas: (filters?: Filters) => fetchJson<Visita[]>('/api/visitas', filters as any),
     getTopSkus: (filters?: Filters) => fetchJson<TopSKU[]>('/api/vendas/top-skus', filters as any),
     getVendasComparativoAnual: () => fetchJson<VendasAnoComparativo[]>('/api/vendas/comparativo-anual'),

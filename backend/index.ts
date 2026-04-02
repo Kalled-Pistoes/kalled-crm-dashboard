@@ -895,6 +895,44 @@ fastify.get('/api/representantes/:nome/comparativo-mes', async (request, reply) 
     } catch (e: any) { reply.status(500).send({ error: e.message }); }
 });
 
+fastify.get('/api/representantes/:nome/clientes-periodo', async (request, reply) => {
+    try {
+        const wb = loadWorkbook();
+        const { nome } = request.params as { nome: string };
+        const query = request.query as { mes?: string; ano?: string };
+        const normNome = normalizeName(decodeURIComponent(nome));
+
+        const rawClientes = getSheet(wb, 'Clientes');
+        const repClientesNorm = new Set<string>();
+        const clienteNomeMap: Record<string, string> = {};
+        rawClientes.forEach((row: any) => {
+            const rep = getRowValue(row, 'Representante', 'representante');
+            if (rep && normalizeName(rep) === normNome) {
+                const c = getRowValue(row, 'Cliente', 'cliente', 'Razão Social');
+                if (c) {
+                    const norm = normalizeName(String(c));
+                    repClientesNorm.add(norm);
+                    clienteNomeMap[norm] = String(c).trim();
+                }
+            }
+        });
+
+        const rawVendas = getSheet(wb, 'Vendas');
+        const clientesComVenda = new Set<string>();
+        rawVendas.forEach((row: any) => {
+            const cli = getRowValue(row, 'Cliente', 'cliente');
+            if (!cli || !repClientesNorm.has(normalizeName(String(cli)))) return;
+            const dateStr = parseDate(getRowValue(row, 'Data', 'data'));
+            if (!dateStr) return;
+            if (query.mes && !dateStr.startsWith(query.mes)) return;
+            if (!query.mes && query.ano && !dateStr.startsWith(query.ano)) return;
+            clientesComVenda.add(normalizeName(String(cli)));
+        });
+
+        return Array.from(clientesComVenda).map(norm => clienteNomeMap[norm]).filter(Boolean);
+    } catch (e: any) { reply.status(500).send({ error: e.message }); }
+});
+
 fastify.get('/api/representantes/:nome/visitas-por-cliente', async (request, reply) => {
     try {
         const wb = loadWorkbook();

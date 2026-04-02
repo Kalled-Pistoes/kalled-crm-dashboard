@@ -10,7 +10,7 @@ import SyncPage from './components/SyncPage';
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Clientes = lazy(() => import('./pages/Clientes'));
 const Vendas = lazy(() => import('./pages/Vendas'));
-const Representantes = lazy(() => import('./pages/Representantes'));
+const Representantes = lazy(() => import('./components/Representantes'));
 const Visitas = lazy(() => import('./pages/Visitas'));
 const GerenciarUsuarios = lazy(() => import('./pages/GerenciarUsuarios'));
 
