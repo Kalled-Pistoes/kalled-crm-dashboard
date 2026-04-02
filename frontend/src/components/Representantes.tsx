@@ -146,14 +146,14 @@ export default function Representantes() {
         : null;
 
     const handleBarClick = (data: any) => {
-        if (!data?.activePayload?.[0]) return;
-        const mes = data.activePayload[0].payload.mes;
+        const mes = data?.mes;
+        if (!mes) return;
         setSelectedPeriodo(prev => prev?.type === 'mes' && prev.value === mes ? null : { type: 'mes', value: mes });
     };
 
-    const handleLineClick = (data: any) => {
-        if (!data?.activePayload?.[0]) return;
-        const ano = data.activePayload[0].payload.ano;
+    const handleLineClick = (_evt: any, payload: any) => {
+        const ano = payload?.payload?.ano;
+        if (!ano) return;
         setSelectedPeriodo(prev => prev?.type === 'ano' && prev.value === ano ? null : { type: 'ano', value: ano });
     };
 
@@ -372,13 +372,13 @@ export default function Representantes() {
                             <div className="overflow-x-auto">
                                 <div style={{ minWidth: Math.max(500, combinedMesData.length * 52) }}>
                                     <ResponsiveContainer width="100%" height={220}>
-                                        <BarChart data={combinedMesData} margin={{ left: 0, right: 8 }} barCategoryGap="30%" onClick={handleBarClick} style={{ cursor: 'pointer' }}>
+                                        <BarChart data={combinedMesData} margin={{ left: 0, right: 8 }} barCategoryGap="30%" style={{ cursor: 'pointer' }}>
                                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                                             <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 600 }} axisLine={false} tickLine={false} />
                                             <YAxis tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} width={44} />
                                             <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                                            <Bar dataKey="pedido" name="Pedido" fill="#6366f1" radius={[3, 3, 0, 0]} />
-                                            <Bar dataKey="visita" name="Visita Técnica" fill="#ec4899" radius={[3, 3, 0, 0]} />
+                                            <Bar dataKey="pedido" name="Pedido" fill="#6366f1" radius={[3, 3, 0, 0]} onClick={handleBarClick} style={{ cursor: 'pointer' }} />
+                                            <Bar dataKey="visita" name="Visita Técnica" fill="#ec4899" radius={[3, 3, 0, 0]} onClick={handleBarClick} style={{ cursor: 'pointer' }} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -399,13 +399,13 @@ export default function Representantes() {
                                 <h2 className="text-sm font-semibold text-white">Média de Venda Geral</h2>
                             </div>
                             <ResponsiveContainer width="100%" height={220}>
-                                <LineChart data={mediaAnualData} margin={{ left: 0, right: 16 }} onClick={handleLineClick} style={{ cursor: 'pointer' }}>
+                                <LineChart data={mediaAnualData} margin={{ left: 0, right: 16 }} style={{ cursor: 'pointer' }}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                                     <XAxis dataKey="ano" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }} axisLine={false} tickLine={false} />
                                     <YAxis tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} width={44} />
                                     <Tooltip content={<ChartTooltip />} />
                                     <Line type="monotone" dataKey="meta" name="Linha de Meta" stroke="#ec4899" strokeWidth={2} strokeDasharray="5 4" dot={false} />
-                                    <Line type="monotone" dataKey="media" name="Média de Vendas" stroke="#6366f1" strokeWidth={2} dot={{ fill: '#6366f1', r: 4, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                                    <Line type="monotone" dataKey="media" name="Média de Vendas" stroke="#6366f1" strokeWidth={2} dot={{ fill: '#6366f1', r: 4, strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0, fill: '#818cf8', cursor: 'pointer', onClick: handleLineClick }} />
                                 </LineChart>
                             </ResponsiveContainer>
                             <div className="flex gap-6 mt-3 justify-center">
