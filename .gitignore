@@ -56,3 +56,7 @@ desktop.ini
 .claude/
 backend/
 atualizar_supabase.bat
+
+# Arquivos obsoletos preservados para histórico
+!obsoleto/
+!obsoleto/**
