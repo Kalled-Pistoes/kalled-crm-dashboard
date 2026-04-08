@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+﻿import { useState, useRef } from 'react';
 import { Upload, Database, CheckCircle, AlertCircle, RefreshCw, FileSpreadsheet, Eye } from 'lucide-react';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -110,7 +110,7 @@ export default function SyncPage() {
         if (!vendasFile) { setError('Selecione o arquivo "Base de Dados de Vendas.xlsx"'); return; }
         setPreviewing(true); setError(null); setPreview(null); setResult(null);
         try {
-            const vendas = await toBase64(vendasFile);
+            const vendas = vendasFile ? await toBase64(vendasFile) : undefined;
             setPreview(await post('sync/preview', { vendas }));
         } catch (e: any) { setError(e.message); }
         finally { setPreviewing(false); }
@@ -120,7 +120,7 @@ export default function SyncPage() {
         if (!vendasFile && !catalogoFile) { setError('Selecione ao menos um arquivo para sincronizar'); return; }
         setLoading(true); setError(null); setResult(null);
         try {
-            const vendas = await toBase64(vendasFile);
+            const vendas = vendasFile ? await toBase64(vendasFile) : undefined;
             const catalogo = catalogoFile ? await toBase64(catalogoFile) : undefined;
             setResult(await post('sync', { vendas, catalogo }));
         } catch (e: any) { setError(e.message); }
