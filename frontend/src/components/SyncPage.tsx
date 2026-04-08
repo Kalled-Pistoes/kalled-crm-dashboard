@@ -117,7 +117,7 @@ export default function SyncPage() {
     };
 
     const handleSync = async () => {
-        if (!vendasFile) { setError('Selecione o arquivo "Base de Dados de Vendas.xlsx"'); return; }
+        if (!vendasFile && !catalogoFile) { setError('Selecione ao menos um arquivo para sincronizar'); return; }
         setLoading(true); setError(null); setResult(null);
         try {
             const vendas = await toBase64(vendasFile);
@@ -158,7 +158,7 @@ export default function SyncPage() {
                 </button>
                 <button
                     onClick={handleSync}
-                    disabled={loading || previewing || !vendasFile}
+                    disabled={loading || previewing || (!vendasFile && !catalogoFile)}
                     className="flex-1 py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2
                         bg-sky-500 hover:bg-sky-400 disabled:bg-white/5 disabled:text-slate-500 disabled:cursor-not-allowed text-white"
                 >

@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+﻿import { createClient } from '@supabase/supabase-js';
 
 const url = import.meta.env.VITE_SUPABASE_URL as string;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -20,6 +20,7 @@ export interface CatalogoProduto {
     diametro_cilindro: number | null;
     ref_metal_leve_sulloy: string | null;
     ref_anel_kalled: string | null;
+    lancamentos: boolean | null;
 }
 
 export const catalogoConfigured = !!(url && key);

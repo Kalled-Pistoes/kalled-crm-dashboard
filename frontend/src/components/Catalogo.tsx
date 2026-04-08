@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, Lock, ChevronRight, Package, AlertCircle } from 'lucide-react';
+import { Search, X, Lock, ChevronRight, Package, AlertCircle, Sparkles } from 'lucide-react';
 import { supabase, catalogoConfigured, type CatalogoProduto } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -10,9 +10,10 @@ interface Filters {
     veiculo: string;
     motor: string;
     grupo: string;
+    lancamentos: boolean;
 }
 
-const EMPTY_FILTERS: Filters = { cod: '', montadora: '', veiculo: '', motor: '', grupo: '' };
+const EMPTY_FILTERS: Filters = { cod: '', montadora: '', veiculo: '', motor: '', grupo: '', lancamentos: false };
 
 export default function Catalogo() {
     const navigate = useNavigate();
@@ -44,7 +45,7 @@ export default function Catalogo() {
 
     async function handleSearch(e: FormEvent) {
         e.preventDefault();
-        const hasFilter = Object.values(filters).some(v => v.trim() !== '');
+        const hasFilter = filters.lancamentos || Object.entries(filters).some(([k, v]) => k !== 'lancamentos' && String(v).trim() !== '');
         if (!hasFilter) return;
 
         setLoading(true);
@@ -61,6 +62,7 @@ export default function Catalogo() {
             if (filters.veiculo.trim())   query = query.ilike('veiculo', `%${filters.veiculo.trim()}%`);
             if (filters.motor.trim())     query = query.ilike('motor', `%${filters.motor.trim()}%`);
             if (filters.grupo)            query = query.eq('grupo', filters.grupo);
+            if (filters.lancamentos)        query = query.eq('lancamentos', true);
 
             const { data, error: err } = await query;
             if (err) throw err;
@@ -230,7 +232,20 @@ export default function Catalogo() {
                                     </select>
                                 </div>
 
-                                <div className="flex items-end gap-2">
+                                <div className="flex items-end gap-2 col-span-1 sm:col-span-2 lg:col-span-1">
+                                    <label className="flex items-center gap-2 cursor-pointer w-full h-full pb-1">
+                                        <div
+                                            onClick={() => setFilters(prev => ({ ...prev, lancamentos: !prev.lancamentos }))}
+                                            className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${filters.lancamentos ? 'bg-amber-500' : 'bg-white/10'}`}
+                                        >
+                                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${filters.lancamentos ? 'left-5' : 'left-0.5'}`} />
+                                        </div>
+                                        <span className="text-xs font-semibold text-slate-300 whitespace-nowrap">Apenas Lançamentos</span>
+                                        {filters.lancamentos && <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />}
+                                    </label>
+                                </div>
+
+                                <div className="flex items-end gap-2 col-span-1 sm:col-span-2 lg:col-span-2">
                                     <button
                                         type="submit"
                                         disabled={loading || !catalogoConfigured}
@@ -301,6 +316,7 @@ export default function Catalogo() {
                                                 <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider">Motor</th>
                                                 <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Ano</th>
                                                 <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Sobremedida</th>
+                                                <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Lançamento</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -318,6 +334,13 @@ export default function Catalogo() {
                                                     <td className="px-4 py-3 text-slate-300 max-w-[180px]">{p.motor ?? '—'}</td>
                                                     <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{p.ano_aplicacao ?? '—'}</td>
                                                     <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{p.sobremedida ?? '—'}</td>
+                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                        {p.lancamentos && (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                                                                <Sparkles className="w-2.5 h-2.5" />Novo
+                                                            </span>
+                                                        )}
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -375,6 +398,13 @@ export default function Catalogo() {
                                                 </div>
                                             )}
                                         </div>
+                                        {p.lancamentos && (
+                                            <div className="mt-2 pt-2 border-t border-white/5">
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                                                    <Sparkles className="w-2.5 h-2.5" />Lançamento
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>

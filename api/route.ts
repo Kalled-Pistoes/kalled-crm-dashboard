@@ -529,7 +529,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!requireAdmin(user, res)) return;
 
             const { vendas: vendasB64, catalogo: catalogoB64 } = req.body || {};
-            if (!vendasB64) return res.status(400).json({ error: 'Campo "vendas" com o arquivo Excel em base64 é obrigatório' });
+            if (!vendasB64 && !catalogoB64) return res.status(400).json({ error: 'Envie ao menos um arquivo Excel (vendas ou catálogo)' });
 
             // ── helpers ──────────────────────────────────────────────────
             const parseCurrency = (v: any): number => {
@@ -639,6 +639,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return res.json({ sheets: Object.keys(wbPrev.Sheets), counts, preview });
             }
 
+            let repsCount = 0, cliCount = 0, prodCount = 0, vendasCount = 0, vrCount = 0, visitasCount = 0;
+
+            if (vendasB64) {
             const wb = await readXlsx(vendasB64);
             const rawMetas     = getSheet(wb, 'Metas Representantes');
             const rawClientes  = getSheet(wb, 'Clientes');
@@ -661,7 +664,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 meta_mensal: parseCurrency(getVal(r,'Meta','meta'))||null,
                 updated_at: new Date().toISOString(),
             })).filter((r:any) => r.nome);
-            const repsCount = await upsertBatch('representantes', repsRows, 'nome');
+            repsCount = await upsertBatch('representantes', repsRows, 'nome');
             const { data: repsData } = await supabase.from('representantes').select('id, nome');
             const repMap = new Map<string,string>((repsData||[]).map((r:any)=>[r.nome,r.id]));
 
@@ -680,7 +683,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     updated_at: new Date().toISOString(),
                 };
             }).filter((c:any)=>c.nome);
-            const cliCount = await upsertBatch('clientes', cliRows, 'nome');
+            cliCount = await upsertBatch('clientes', cliRows, 'nome');
             const { data: cliData } = await supabase.from('clientes').select('id, nome');
             const cliMap = new Map<string,string>((cliData||[]).map((c:any)=>[c.nome,c.id]));
             const normNome = (s:string) => s.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]/g,' ').replace(/\s+/g,' ').trim();
@@ -697,7 +700,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const linhas = [...(rl?['Metal Leve']:[]), ...(rs?['Sulloy']:[]), ...(rk?['KS']:[]), ...(ra?['Apex']:[])];
                 return { pn, descricao: String(getVal(r,'Descrição','Descricao','descricao')||'').trim()||null, linhas, ref_metal_leve:rl, ref_sulloy:rs, ref_ks:rk, ref_apex:ra };
             }).filter(Boolean);
-            const prodCount = await upsertBatch('produtos', prodRows as any[], 'pn');
+            prodCount = await upsertBatch('produtos', prodRows as any[], 'pn');
             const { data: prodData } = await supabase.from('produtos').select('id, pn');
             const prodMap = new Map<string,string>((prodData||[]).map((p:any)=>[p.pn,p.id]));
 
@@ -717,7 +720,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const repId = repNome ? repMap.get(String(getVal(repNome,'Representante','representante')||'').trim()) : undefined;
                 return { data, cliente_id: findCliId(cliente), produto_id: prodMap.get(sku)||null, quantidade: parseCurrency(getVal(r,'Quantidade','quantidade'))||null, valor: parseCurrency(getVal(r,'Valor','valor'))||null, representante_id: repId||null };
             }).filter(Boolean);
-            const vendasCount = await insertBatch('vendas', vendasRows as any[]);
+            vendasCount = await insertBatch('vendas', vendasRows as any[]);
 
             // ── vendas_representantes ─────────────────────────────────────
             const vrRows = rawVendasRep.map((r:any) => {
@@ -727,7 +730,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (!data||!vendedor) return null;
                 return { data, representante_id: repMap.get(vendedor)||null, cliente_id: findCliId(cliente), cliente_nome: cliente||null, valor_pedido: parseCurrency(getVal(r,'Valor do Pedido',' Valor do Pedido ','Valor','valor'))||null };
             }).filter(Boolean);
-            const vrCount = await insertBatch('vendas_representantes', vrRows as any[]);
+            vrCount = await insertBatch('vendas_representantes', vrRows as any[]);
 
             // ── visitas ───────────────────────────────────────────────────
             const visitasRows = rawVisitas.map((r:any) => {
@@ -737,7 +740,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (!data||!rep) return null;
                 return { data, tipo_visita: String(getVal(r,'Tipo de Visita','tipo de visita')||'').trim()||null, representante_id: repMap.get(rep)||null, cliente_id: findCliId(cliente), custo_visita: parseCurrency(getVal(r,'Custo da Visita (R$)','Custo da Visita','custo da visita (r$)','custo da visita'))||0 };
             }).filter(Boolean);
-            const visitasCount = await insertBatch('visitas_tecnicas', visitasRows as any[]);
+            visitasCount = await insertBatch('visitas_tecnicas', visitasRows as any[]);
+
+            } // fim if (vendasB64)
 
             // ── catálogo (opcional) ───────────────────────────────────────
             let catalogoCount = 0;
@@ -750,7 +755,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     if (!cod) return null;
                     const cl = (v:any) => v ? String(v).trim().replace(/\r\n/g,' / ').replace(/\n/g,' / ')||null : null;
                     const cn = (v:any) => { const n = parseFloat(v); return isNaN(n)?null:n; };
-                    return { cod, pa: cl(r['PA']), descricao: cl(r['DESCRIÇÃO']), grupo: cl(r['Grupo']||r['GRUPO']), montadora: cl(r['MONTADORA']), veiculo: cl(r['VEICULO']||r['VEÍCULO']), ano_aplicacao: cl(r['ANO DE APLICAÇÃO']), motor: cl(r['MOTOR']), sobremedida: cl(r['SOBREMEDIDA']), qtd_pistoes: cn(r['QUANTIDADE DE PISTÕES'])!==null?Math.round(cn(r['QUANTIDADE DE PISTÕES'])!):null, diametro_cilindro: cn(r['DIAMETRO DO CILINDRO']), ref_metal_leve_sulloy: cl(r['CÓD REF METAL LEVE / SULOY']||r['CÓD REF METAL LEVE / SULLOY']), ref_anel_kalled: cl(r['REF ANEL KALLED']), updated_at: new Date().toISOString() };
+                    const lancRaw = cl(r['LANÇAMENTOS']||r['LANÇAMENTO']||r['Lançamentos']||r['Lançamento']||r['lancamentos']||r['lancamento']||r['LANCAMENTOS']||r['LANCAMENTO']);
+                    const lancamentos = lancRaw ? !['nao','não','n','false','0','no',''].includes(lancRaw.toLowerCase().trim()) : false;
+                    return { cod, pa: cl(r['PA']), descricao: cl(r['DESCRIÇÃO']), grupo: cl(r['Grupo']||r['GRUPO']), montadora: cl(r['MONTADORA']), veiculo: cl(r['VEICULO']||r['VEÍCULO']), ano_aplicacao: cl(r['ANO DE APLICAÇÃO']), motor: cl(r['MOTOR']), sobremedida: cl(r['SOBREMEDIDA']), qtd_pistoes: cn(r['QUANTIDADE DE PISTÕES'])!==null?Math.round(cn(r['QUANTIDADE DE PISTÕES'])!):null, diametro_cilindro: cn(r['DIAMETRO DO CILINDRO']), ref_metal_leve_sulloy: cl(r['CÓD REF METAL LEVE / SULOY']||r['CÓD REF METAL LEVE / SULLOY']), ref_anel_kalled: cl(r['REF ANEL KALLED']), lancamentos, updated_at: new Date().toISOString() };
                 }).filter(Boolean);
                 const { error: delCat } = await supabase.from('catalogo_produtos').delete().neq('id','00000000-0000-0000-0000-000000000000');
                 if (delCat) throw new Error(`Truncate catalogo_produtos: ${delCat.message}`);
