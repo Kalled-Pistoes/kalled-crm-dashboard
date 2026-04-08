@@ -54,3 +54,5 @@ desktop.ini
 
 # Claude Code
 .claude/
+backend/
+atualizar_supabase.bat
