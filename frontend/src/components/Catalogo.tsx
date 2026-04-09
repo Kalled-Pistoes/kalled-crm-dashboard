@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface Filters {
     cod: string;
+    ref: string;
     montadora: string;
     veiculo: string;
     motor: string;
@@ -13,7 +14,7 @@ interface Filters {
     lancamentos: boolean;
 }
 
-const EMPTY: Filters = { cod: '', montadora: '', veiculo: '', motor: '', grupo: '', lancamentos: false };
+const EMPTY: Filters = { cod: '', ref: '', montadora: '', veiculo: '', motor: '', grupo: '', lancamentos: false };
 
 function useTheme() {
     const [dark, setDark] = useState<boolean>(() => {
@@ -87,6 +88,7 @@ export default function Catalogo() {
         try {
             let query = supabase.from('catalogo_produtos').select('*').order('cod').limit(200);
             if (filters.cod.trim())     query = query.ilike('cod', `%${filters.cod.trim()}%`);
+            if (filters.ref.trim())     query = query.or(`ref_metal_leve_sulloy.ilike.%${filters.ref.trim()}%,ref_anel_kalled.ilike.%${filters.ref.trim()}%`);
             if (filters.montadora)      query = query.eq('montadora', filters.montadora);
             if (filters.veiculo.trim()) query = query.ilike('veiculo', `%${filters.veiculo.trim()}%`);
             if (filters.motor.trim())   query = query.ilike('motor', `%${filters.motor.trim()}%`);
@@ -197,6 +199,17 @@ export default function Catalogo() {
                                     placeholder="Ex: P2110"
                                     className={inputCls}
                                 />
+                            </div>
+                            <div>
+                                <label className={`block mb-2 ${t.label(dark)}`}>Código de Referência</label>
+                                <input
+                                    type="text"
+                                    value={filters.ref}
+                                    onChange={e => set('ref', e.target.value)}
+                                    placeholder="Ex: ML1234, 123456..."
+                                    className={inputCls}
+                                />
+                                <p className={`mt-1 text-xs ${t.muted(dark)}`}>Busca em todas as referências de concorrentes</p>
                             </div>
                             <div>
                                 <label className={`block mb-2 ${t.label(dark)}`}>Montadora</label>
@@ -343,7 +356,7 @@ export default function Catalogo() {
                                 <table className="w-full border-collapse" style={{ fontSize: '15px' }}>
                                     <thead>
                                         <tr className={t.thead(dark)}>
-                                            {['Código','PA','Descrição','Grupo','Montadora','Veículo','Motor','Ano','Sobremedida','Lançamento'].map(h => (
+                                            {['Código','PA','Descrição','Grupo','Montadora','Veículo','Motor','Ano','Sobremedida','Ref. Concorrente','Lançamento'].map(h => (
                                                 <th key={h} className="text-left px-4 py-4 font-bold uppercase tracking-wider text-sm whitespace-nowrap first:pl-5 last:pr-5">
                                                     {h}
                                                 </th>
@@ -362,6 +375,14 @@ export default function Catalogo() {
                                                 <td className={`px-4 py-4 max-w-[200px] ${t.cell(dark)}`}>{p.motor ?? '—'}</td>
                                                 <td className={`px-4 py-4 whitespace-nowrap ${t.cell(dark)}`}>{p.ano_aplicacao ?? '—'}</td>
                                                 <td className={`px-4 py-4 whitespace-nowrap ${t.cell(dark)}`}>{p.sobremedida ?? '—'}</td>
+                                                <td className={`px-4 py-4 max-w-[180px] ${t.cell(dark)}`}>
+                                                    {(p.ref_metal_leve_sulloy || p.ref_anel_kalled) ? (
+                                                        <div className="space-y-0.5">
+                                                            {p.ref_metal_leve_sulloy && <span className={`block text-xs font-mono ${dark ? 'text-sky-300' : 'text-sky-700'}`}>{p.ref_metal_leve_sulloy}</span>}
+                                                            {p.ref_anel_kalled && <span className={`block text-xs font-mono ${dark ? 'text-violet-300' : 'text-violet-700'}`}>{p.ref_anel_kalled}</span>}
+                                                        </div>
+                                                    ) : '—'}
+                                                </td>
                                                 <td className={`px-4 py-4 last:pr-5 whitespace-nowrap ${t.cell(dark)}`}>
                                                     {p.lancamentos && (
                                                         <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${t.badge(dark)}`}>
@@ -415,6 +436,15 @@ export default function Catalogo() {
                                             <div className="col-span-2">
                                                 <p className={`text-xs font-bold uppercase tracking-wider mb-0.5 ${t.muted(dark)}`}>Motor</p>
                                                 <p className="text-base font-medium">{p.motor}</p>
+                                            </div>
+                                        )}
+                                        {(p.ref_metal_leve_sulloy || p.ref_anel_kalled) && (
+                                            <div className="col-span-2">
+                                                <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${t.muted(dark)}`}>Ref. Concorrente</p>
+                                                <div className="space-y-0.5">
+                                                    {p.ref_metal_leve_sulloy && <p className={`text-sm font-mono ${dark ? 'text-sky-300' : 'text-sky-700'}`}>{p.ref_metal_leve_sulloy}</p>}
+                                                    {p.ref_anel_kalled && <p className={`text-sm font-mono ${dark ? 'text-violet-300' : 'text-violet-700'}`}>{p.ref_anel_kalled}</p>}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
