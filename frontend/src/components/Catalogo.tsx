@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, Lock, ChevronRight, Package, AlertCircle, Sparkles } from 'lucide-react';
+import { Search, X, Lock, ChevronRight, Package, AlertCircle, Sun, Moon, Sparkles } from 'lucide-react';
 import { supabase, catalogoConfigured, type CatalogoProduto } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -13,13 +13,49 @@ interface Filters {
     lancamentos: boolean;
 }
 
-const EMPTY_FILTERS: Filters = { cod: '', montadora: '', veiculo: '', motor: '', grupo: '', lancamentos: false };
+const EMPTY: Filters = { cod: '', montadora: '', veiculo: '', motor: '', grupo: '', lancamentos: false };
+
+function useTheme() {
+    const [dark, setDark] = useState<boolean>(() => {
+        const saved = localStorage.getItem('catalogo_theme');
+        return saved ? saved === 'dark' : false;
+    });
+    const toggle = () => setDark((d: boolean) => {
+        localStorage.setItem('catalogo_theme', !d ? 'dark' : 'light');
+        return !d;
+    });
+    return { dark, toggle };
+}
+
+// ── Tokens de cor por tema ─────────────────────────────────────────────────
+const t = {
+    page:       (d: boolean) => d ? 'bg-[#18181b] text-[#f0f0f0]' : 'bg-[#f0f0f0] text-[#1a1a1a]',
+    header:     (d: boolean) => d ? 'bg-[#1f1f23] border-[#333]' : 'bg-white border-[#d0d0d0]',
+    card:       (d: boolean) => d ? 'bg-[#232328] border border-[#333] rounded-xl' : 'bg-white border border-[#d0d0d0] rounded-xl shadow-sm',
+    label:      (d: boolean) => d ? 'text-[#a0a0a8] font-bold text-sm uppercase tracking-wider' : 'text-[#555] font-bold text-sm uppercase tracking-wider',
+    input:      (d: boolean) => d
+        ? 'bg-[#18181b] border-2 border-[#444] text-[#f0f0f0] placeholder-[#666] focus:border-[#C01717] focus:bg-[#1a1a1e]'
+        : 'bg-white border-2 border-[#ccc] text-[#1a1a1a] placeholder-[#aaa] focus:border-[#C01717] focus:bg-white',
+    thead:      (d: boolean) => d ? 'bg-[#2a2a30] text-[#b0b0b8]' : 'bg-[#2a2a2e] text-white',
+    rowEven:    (d: boolean) => d ? 'bg-[#232328]' : 'bg-white',
+    rowOdd:     (d: boolean) => d ? 'bg-[#1f1f24]' : 'bg-[#f8f8f8]',
+    rowHover:   (d: boolean) => d ? 'hover:bg-[#2d2d35]' : 'hover:bg-[#ffeaea]',
+    cell:       (d: boolean) => d ? 'text-[#d0d0d8] border-b border-[#2e2e34]' : 'text-[#333] border-b border-[#e8e8e8]',
+    badge:      (d: boolean) => d
+        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+        : 'bg-amber-50 text-amber-700 border border-amber-300',
+    divider:    (d: boolean) => d ? 'border-[#333]' : 'border-[#d0d0d0]',
+    muted:      (d: boolean) => d ? 'text-[#666]' : 'text-[#888]',
+    cod:        (d: boolean) => d ? 'text-[#e05050] font-bold font-mono' : 'text-[#C01717] font-bold font-mono',
+    toggleBg:   (d: boolean) => d ? 'bg-[#2a2a30] hover:bg-[#333] text-[#d0d0d8]' : 'bg-[#e8e8e8] hover:bg-[#ddd] text-[#555]',
+};
 
 export default function Catalogo() {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { dark, toggle } = useTheme();
 
-    const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+    const [filters, setFilters] = useState<Filters>(EMPTY);
     const [results, setResults] = useState<CatalogoProduto[]>([]);
     const [loading, setLoading] = useState(false);
     const [searched, setSearched] = useState(false);
@@ -47,375 +83,351 @@ export default function Catalogo() {
         e.preventDefault();
         const hasFilter = filters.lancamentos || Object.entries(filters).some(([k, v]) => k !== 'lancamentos' && String(v).trim() !== '');
         if (!hasFilter) return;
-
-        setLoading(true);
-        setError('');
+        setLoading(true); setError('');
         try {
-            let query = supabase
-                .from('catalogo_produtos')
-                .select('*')
-                .order('cod')
-                .limit(100);
-
-            if (filters.cod.trim())       query = query.ilike('cod', `%${filters.cod.trim()}%`);
-            if (filters.montadora)        query = query.eq('montadora', filters.montadora);
-            if (filters.veiculo.trim())   query = query.ilike('veiculo', `%${filters.veiculo.trim()}%`);
-            if (filters.motor.trim())     query = query.ilike('motor', `%${filters.motor.trim()}%`);
-            if (filters.grupo)            query = query.eq('grupo', filters.grupo);
-            if (filters.lancamentos)        query = query.eq('lancamentos', true);
-
+            let query = supabase.from('catalogo_produtos').select('*').order('cod').limit(200);
+            if (filters.cod.trim())     query = query.ilike('cod', `%${filters.cod.trim()}%`);
+            if (filters.montadora)      query = query.eq('montadora', filters.montadora);
+            if (filters.veiculo.trim()) query = query.ilike('veiculo', `%${filters.veiculo.trim()}%`);
+            if (filters.motor.trim())   query = query.ilike('motor', `%${filters.motor.trim()}%`);
+            if (filters.grupo)          query = query.eq('grupo', filters.grupo);
+            if (filters.lancamentos)    query = query.eq('lancamentos', true);
             const { data, error: err } = await query;
             if (err) throw err;
             setResults(data || []);
-        } catch {
-            setError('Erro ao consultar catálogo. Verifique sua conexão.');
-        } finally {
-            setLoading(false);
-            setSearched(true);
-        }
+        } catch { setError('Erro ao consultar o catálogo. Verifique sua conexão.'); }
+        finally { setLoading(false); setSearched(true); }
     }
 
-    function handleClear() {
-        setFilters(EMPTY_FILTERS);
-        setResults([]);
-        setSearched(false);
-        setError('');
-    }
+    function handleClear() { setFilters(EMPTY); setResults([]); setSearched(false); setError(''); }
+    const set = (k: keyof Filters, v: string) => setFilters((p: Filters) => ({ ...p, [k]: v }));
 
-    const setField = (k: keyof Filters, v: string) =>
-        setFilters(prev => ({ ...prev, [k]: v }));
+    // Shared input/select class
+    const inputCls = `w-full rounded-lg px-4 py-3 text-base outline-none transition-all ${t.input(dark)}`;
+    const selectBg = dark ? '#18181b' : '#ffffff';
 
     return (
-        <div className="min-h-screen bg-pbi-bg text-pbi-text flex flex-col">
-            {/* Background glow */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden">
-                <div className="absolute -top-[15%] -left-[10%] w-[45%] h-[45%] bg-red-700/8 blur-[140px] rounded-full" />
-                <div className="absolute top-[30%] -right-[5%] w-[30%] h-[30%] bg-brand-500/8 blur-[120px] rounded-full" />
-            </div>
+        <div className={`min-h-screen flex flex-col ${t.page(dark)}`} style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
 
-            {/* Header */}
-            <header className="glass-header border-b border-white/8 flex items-center justify-between px-4 sm:px-8 py-3 z-10 flex-shrink-0">
-                <div className="flex items-center gap-3">
+            {/* ── Header ───────────────────────────────────────────────── */}
+            <header className={`border-b ${t.header(dark)} px-4 sm:px-8 py-3 flex items-center justify-between sticky top-0 z-20`}>
+                <div className="flex items-center gap-4">
                     <img
                         src="/logo-kalled.png"
                         alt="Kalled Pistões"
-                        className="h-9 sm:h-11 object-contain"
+                        className="h-10 sm:h-12 object-contain"
                         onError={e => {
                             e.currentTarget.style.display = 'none';
                             const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
-                            if (fb) fb.style.display = 'flex';
+                            if (fb) fb.style.removeProperty('display');
                         }}
                     />
-                    {/* Fallback text logo */}
-                    <div className="hidden items-center gap-1.5">
-                        <span className="text-2xl font-black text-red-500 italic leading-none">K</span>
-                        <div className="leading-tight">
-                            <p className="text-sm font-black tracking-widest text-white uppercase">Kalled</p>
-                            <p className="text-[9px] font-semibold tracking-[0.3em] text-slate-400 uppercase">Pistões</p>
+                    <div className="hidden items-center gap-2">
+                        <span className="text-3xl font-black text-[#C01717] italic">K</span>
+                        <div>
+                            <p className="text-base font-black tracking-widest uppercase leading-none">Kalled</p>
+                            <p className="text-[10px] font-semibold tracking-[0.3em] opacity-50 uppercase">Pistões</p>
                         </div>
+                    </div>
+                    <div className={`hidden sm:block border-l pl-4 ${t.divider(dark)}`}>
+                        <p className="text-xs font-semibold opacity-50 uppercase tracking-wider">Catálogo de Produtos</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 sm:gap-3">
+                    {/* Modo claro/escuro */}
+                    <button
+                        onClick={toggle}
+                        title={dark ? 'Modo Claro' : 'Modo Escuro'}
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all border ${t.divider(dark)} ${t.toggleBg(dark)}`}
+                    >
+                        {dark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                        <span className="hidden sm:inline">{dark ? 'Modo Claro' : 'Modo Escuro'}</span>
+                    </button>
+
                     {user && (
                         <button
                             onClick={() => navigate('/dashboard')}
-                            className="hidden sm:flex items-center gap-1 text-xs text-sky-400 hover:text-sky-300 font-medium transition-colors"
+                            className="hidden sm:flex items-center gap-1 text-sm font-semibold text-[#C01717] hover:opacity-80 transition-opacity"
                         >
-                            Dashboard
-                            <ChevronRight className="w-3.5 h-3.5" />
+                            Dashboard <ChevronRight className="w-4 h-4" />
                         </button>
                     )}
                     <button
                         onClick={() => navigate('/login')}
-                        className="flex items-center gap-1.5 text-xs font-medium text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 px-3 py-1.5 rounded-lg transition-all"
+                        className={`flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg border transition-all ${t.divider(dark)} ${t.toggleBg(dark)}`}
                     >
-                        <Lock className="w-3 h-3" />
+                        <Lock className="w-4 h-4" />
                         <span className="hidden sm:inline">Área Restrita</span>
                     </button>
                 </div>
             </header>
 
-            {/* Content */}
-            <div className="flex-1 flex flex-col z-10">
-                <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-6">
-                    <div className="text-center mb-8">
-                        <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white mb-2">
-                            Consulta de Catálogo
-                        </h1>
-                        <p className="text-slate-400 text-sm">
-                            Encontre o produto certo para o seu veículo
-                        </p>
-                    </div>
+            {/* ── Conteúdo ─────────────────────────────────────────────── */}
+            <div className="flex-1 w-full max-w-6xl mx-auto px-4 sm:px-8 py-8">
 
-                    {/* Search Card */}
-                    <div className="card">
-                        {!catalogoConfigured && (
-                            <div className="flex items-center gap-2 text-amber-400 text-xs bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 mb-4">
-                                <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                                Catálogo não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.
-                            </div>
-                        )}
-
-                        <form onSubmit={handleSearch}>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                                        Código do Produto
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={filters.cod}
-                                        onChange={e => setField('cod', e.target.value)}
-                                        placeholder="Ex: P2000"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:ring-1 focus:ring-red-500/50 focus:border-red-500/30 transition-all"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                                        Montadora
-                                    </label>
-                                    <select
-                                        value={filters.montadora}
-                                        onChange={e => setField('montadora', e.target.value)}
-                                        disabled={catalogoConfigured && !optionsLoaded}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-red-500/50 focus:border-red-500/30 transition-all appearance-none cursor-pointer disabled:opacity-50"
-                                    >
-                                        <option value="" className="bg-slate-900">Todas</option>
-                                        {montadoras.map(m => (
-                                            <option key={m} value={m} className="bg-slate-900">{m}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                                        Veículo / Modelo
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={filters.veiculo}
-                                        onChange={e => setField('veiculo', e.target.value)}
-                                        placeholder="Ex: Gol, Palio, Uno..."
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:ring-1 focus:ring-red-500/50 focus:border-red-500/30 transition-all"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                                        Motor
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={filters.motor}
-                                        onChange={e => setField('motor', e.target.value)}
-                                        placeholder="Ex: 1.0 8V, EA111..."
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:ring-1 focus:ring-red-500/50 focus:border-red-500/30 transition-all"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">
-                                        Grupo / Tipo
-                                    </label>
-                                    <select
-                                        value={filters.grupo}
-                                        onChange={e => setField('grupo', e.target.value)}
-                                        disabled={catalogoConfigured && !optionsLoaded}
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-red-500/50 focus:border-red-500/30 transition-all appearance-none cursor-pointer disabled:opacity-50"
-                                    >
-                                        <option value="" className="bg-slate-900">Todos</option>
-                                        {grupos.map(g => (
-                                            <option key={g} value={g} className="bg-slate-900">{g}</option>
-                                        ))}
-                                    </select>
-                                </div>
-
-                                <div className="flex items-end gap-2 col-span-1 sm:col-span-2 lg:col-span-1">
-                                    <label className="flex items-center gap-2 cursor-pointer w-full h-full pb-1">
-                                        <div
-                                            onClick={() => setFilters(prev => ({ ...prev, lancamentos: !prev.lancamentos }))}
-                                            className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${filters.lancamentos ? 'bg-amber-500' : 'bg-white/10'}`}
-                                        >
-                                            <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${filters.lancamentos ? 'left-5' : 'left-0.5'}`} />
-                                        </div>
-                                        <span className="text-xs font-semibold text-slate-300 whitespace-nowrap">Apenas Lançamentos</span>
-                                        {filters.lancamentos && <Sparkles className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />}
-                                    </label>
-                                </div>
-
-                                <div className="flex items-end gap-2 col-span-1 sm:col-span-2 lg:col-span-2">
-                                    <button
-                                        type="submit"
-                                        disabled={loading || !catalogoConfigured}
-                                        className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 disabled:bg-red-600/40 text-white font-semibold py-2.5 rounded-xl text-sm transition-all active:scale-95"
-                                    >
-                                        <Search className="w-4 h-4" />
-                                        {loading ? 'Pesquisando...' : 'Pesquisar'}
-                                    </button>
-                                    {searched && (
-                                        <button
-                                            type="button"
-                                            onClick={handleClear}
-                                            className="p-2.5 text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all"
-                                            title="Limpar"
-                                        >
-                                            <X className="w-4 h-4" />
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </form>
-                    </div>
+                {/* Título */}
+                <div className="mb-7">
+                    <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[#C01717]">
+                        Consulta de Catálogo
+                    </h1>
+                    <p className={`mt-1 text-base ${t.muted(dark)}`}>
+                        Encontre o produto certo para o seu veículo
+                    </p>
                 </div>
 
-                {/* Results */}
-                <div className="w-full max-w-5xl mx-auto px-4 sm:px-6 pb-10">
-                    {error && (
-                        <div className="flex items-center gap-2 text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 mb-4">
-                            <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                            {error}
+                {/* ── Painel de Filtros ─────────────────────────────────── */}
+                <div className={`${t.card(dark)} p-6 mb-7`}>
+                    {!catalogoConfigured && (
+                        <div className="flex items-center gap-2 text-amber-600 text-sm bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-5">
+                            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                            Catálogo não configurado. Defina VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.
                         </div>
                     )}
 
-                    {!searched && !loading && (
-                        <div className="text-center py-16 text-slate-600">
-                            <Package className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                            <p className="text-sm">Use os filtros acima para pesquisar no catálogo</p>
-                        </div>
-                    )}
-
-                    {searched && !loading && results.length === 0 && (
-                        <div className="text-center py-16">
-                            <Search className="w-10 h-10 mx-auto mb-3 text-slate-600 opacity-30" />
-                            <p className="text-sm font-medium text-slate-400">Nenhum produto encontrado</p>
-                            <p className="text-xs text-slate-600 mt-1">Tente ajustar os filtros da pesquisa</p>
-                        </div>
-                    )}
-
-                    {searched && results.length > 0 && (
-                        <>
-                            <p className="text-xs text-slate-500 mb-3">
-                                {results.length} resultado{results.length !== 1 ? 's' : ''} encontrado{results.length !== 1 ? 's' : ''}
-                                {results.length === 100 ? ' — mostrando os primeiros 100' : ''}
-                            </p>
-
-                            {/* Desktop Table */}
-                            <div className="hidden sm:block card p-0 overflow-hidden">
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-xs">
-                                        <thead>
-                                            <tr className="border-b border-white/10">
-                                                <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Código</th>
-                                                <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">PA</th>
-                                                <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider">Descrição</th>
-                                                <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Grupo</th>
-                                                <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Montadora</th>
-                                                <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider">Veículo</th>
-                                                <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider">Motor</th>
-                                                <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Ano</th>
-                                                <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Sobremedida</th>
-                                                <th className="text-left px-4 py-3 font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Lançamento</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {results.map((p, i) => (
-                                                <tr
-                                                    key={p.id}
-                                                    className={`border-b border-white/5 hover:bg-white/5 transition-colors ${i % 2 !== 0 ? 'bg-white/2' : ''}`}
-                                                >
-                                                    <td className="px-4 py-3 font-mono font-bold text-red-400 whitespace-nowrap">{p.cod}</td>
-                                                    <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{p.pa ?? '—'}</td>
-                                                    <td className="px-4 py-3 text-white">{p.descricao ?? '—'}</td>
-                                                    <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{p.grupo ?? '—'}</td>
-                                                    <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{p.montadora ?? '—'}</td>
-                                                    <td className="px-4 py-3 text-slate-300 max-w-[140px]">{p.veiculo ?? '—'}</td>
-                                                    <td className="px-4 py-3 text-slate-300 max-w-[180px]">{p.motor ?? '—'}</td>
-                                                    <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{p.ano_aplicacao ?? '—'}</td>
-                                                    <td className="px-4 py-3 text-slate-300 whitespace-nowrap">{p.sobremedida ?? '—'}</td>
-                                                    <td className="px-4 py-3 whitespace-nowrap">
-                                                        {p.lancamentos && (
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                                                                <Sparkles className="w-2.5 h-2.5" />Novo
-                                                            </span>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
+                    <form onSubmit={handleSearch}>
+                        {/* Linha 1 */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-5">
+                            <div>
+                                <label className={`block mb-2 ${t.label(dark)}`}>Nº do Produto / Código</label>
+                                <input
+                                    type="text"
+                                    value={filters.cod}
+                                    onChange={e => set('cod', e.target.value)}
+                                    placeholder="Ex: P2110"
+                                    className={inputCls}
+                                />
                             </div>
+                            <div>
+                                <label className={`block mb-2 ${t.label(dark)}`}>Montadora</label>
+                                <select
+                                    value={filters.montadora}
+                                    onChange={e => set('montadora', e.target.value)}
+                                    disabled={catalogoConfigured && !optionsLoaded}
+                                    className={`${inputCls} cursor-pointer disabled:opacity-50`}
+                                    style={{ backgroundColor: selectBg }}
+                                >
+                                    <option value="">Todas as Montadoras</option>
+                                    {montadoras.map(m => <option key={m} value={m}>{m}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className={`block mb-2 ${t.label(dark)}`}>Veículo / Modelo</label>
+                                <input
+                                    type="text"
+                                    value={filters.veiculo}
+                                    onChange={e => set('veiculo', e.target.value)}
+                                    placeholder="Ex: Gol, Palio, Uno..."
+                                    className={inputCls}
+                                />
+                            </div>
+                        </div>
 
-                            {/* Mobile Cards */}
-                            <div className="sm:hidden space-y-3">
-                                {results.map(p => (
-                                    <div key={p.id} className="card p-4">
-                                        <div className="flex items-start justify-between gap-2 mb-3">
-                                            <div>
-                                                <span className="font-mono font-bold text-red-400 text-base">{p.cod}</span>
-                                                {p.pa && <span className="ml-2 text-xs text-slate-500">{p.pa}</span>}
-                                            </div>
+                        {/* Linha 2 */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
+                            <div>
+                                <label className={`block mb-2 ${t.label(dark)}`}>Motor</label>
+                                <input
+                                    type="text"
+                                    value={filters.motor}
+                                    onChange={e => set('motor', e.target.value)}
+                                    placeholder="Ex: 1.0 8V, EA111..."
+                                    className={inputCls}
+                                />
+                            </div>
+                            <div>
+                                <label className={`block mb-2 ${t.label(dark)}`}>Grupo / Tipo</label>
+                                <select
+                                    value={filters.grupo}
+                                    onChange={e => set('grupo', e.target.value)}
+                                    disabled={catalogoConfigured && !optionsLoaded}
+                                    className={`${inputCls} cursor-pointer disabled:opacity-50`}
+                                    style={{ backgroundColor: selectBg }}
+                                >
+                                    <option value="">Todos os Grupos</option>
+                                    {grupos.map(g => <option key={g} value={g}>{g}</option>)}
+                                </select>
+                            </div>
+                            {/* Toggle lançamentos */}
+                            <div className="flex items-end pb-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setFilters(p => ({ ...p, lancamentos: !p.lancamentos }))}
+                                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg border-2 text-base font-semibold transition-all ${
+                                        filters.lancamentos
+                                            ? 'border-amber-500 bg-amber-500/10 text-amber-600'
+                                            : `border-2 ${dark ? 'border-[#444] text-[#888]' : 'border-[#ccc] text-[#888]'}`
+                                    }`}
+                                >
+                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
+                                        filters.lancamentos ? 'bg-amber-500 border-amber-500' : dark ? 'border-[#555]' : 'border-[#bbb]'
+                                    }`}>
+                                        {filters.lancamentos && <span className="text-white text-xs font-black">✓</span>}
+                                    </div>
+                                    <Sparkles className={`w-4 h-4 flex-shrink-0 ${filters.lancamentos ? 'text-amber-500' : ''}`} />
+                                    Apenas Lançamentos
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Botões */}
+                        <div className={`flex gap-3 pt-5 border-t ${t.divider(dark)}`}>
+                            <button
+                                type="submit"
+                                disabled={loading || !catalogoConfigured}
+                                className="flex items-center justify-center gap-2 bg-[#C01717] hover:bg-[#a01212] disabled:opacity-50 text-white font-bold text-base py-3 px-8 rounded-lg transition-all active:scale-95 min-w-[160px]"
+                            >
+                                <Search className="w-5 h-5" />
+                                {loading ? 'Pesquisando...' : 'Pesquisar'}
+                            </button>
+                            {searched && (
+                                <button
+                                    type="button"
+                                    onClick={handleClear}
+                                    className={`flex items-center gap-2 font-semibold text-base py-3 px-5 rounded-lg border-2 transition-all ${
+                                        dark ? 'border-[#444] text-[#aaa] hover:bg-[#2a2a2e]' : 'border-[#ccc] text-[#666] hover:bg-[#f0f0f0]'
+                                    }`}
+                                >
+                                    <X className="w-5 h-5" />
+                                    Limpar
+                                </button>
+                            )}
+                        </div>
+                    </form>
+                </div>
+
+                {/* ── Resultados ───────────────────────────────────────── */}
+                {error && (
+                    <div className="flex items-center gap-3 text-red-700 bg-red-50 border border-red-200 rounded-xl px-5 py-4 mb-5 text-base">
+                        <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                        {error}
+                    </div>
+                )}
+
+                {!searched && !loading && (
+                    <div className={`text-center py-20 ${t.muted(dark)}`}>
+                        <Package className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                        <p className="text-lg font-medium opacity-60">Use os filtros acima para pesquisar no catálogo</p>
+                        <p className="text-sm mt-1 opacity-40">Preencha ao menos um campo e clique em Pesquisar</p>
+                    </div>
+                )}
+
+                {loading && (
+                    <div className={`text-center py-20 ${t.muted(dark)}`}>
+                        <div className="inline-block w-10 h-10 border-4 border-[#C01717] border-t-transparent rounded-full animate-spin mb-4" />
+                        <p className="text-lg font-medium">Pesquisando...</p>
+                    </div>
+                )}
+
+                {searched && !loading && results.length === 0 && (
+                    <div className={`text-center py-20 ${t.muted(dark)}`}>
+                        <Search className="w-14 h-14 mx-auto mb-4 opacity-20" />
+                        <p className="text-lg font-semibold">Nenhum produto encontrado</p>
+                        <p className="text-sm mt-1 opacity-60">Tente ajustar os filtros da pesquisa</p>
+                    </div>
+                )}
+
+                {searched && !loading && results.length > 0 && (
+                    <>
+                        <div className="flex items-center justify-between mb-4">
+                            <p className={`text-base font-semibold ${t.muted(dark)}`}>
+                                <span className="text-[#C01717] font-black text-lg">{results.length}</span>
+                                {' '}resultado{results.length !== 1 ? 's' : ''} encontrado{results.length !== 1 ? 's' : ''}
+                                {results.length === 200 ? ' — mostrando os primeiros 200' : ''}
+                            </p>
+                        </div>
+
+                        {/* Desktop Table */}
+                        <div className={`hidden sm:block ${t.card(dark)} overflow-hidden p-0`}>
+                            <div className="overflow-x-auto">
+                                <table className="w-full border-collapse" style={{ fontSize: '15px' }}>
+                                    <thead>
+                                        <tr className={t.thead(dark)}>
+                                            {['Código','PA','Descrição','Grupo','Montadora','Veículo','Motor','Ano','Sobremedida','Lançamento'].map(h => (
+                                                <th key={h} className="text-left px-4 py-4 font-bold uppercase tracking-wider text-sm whitespace-nowrap first:pl-5 last:pr-5">
+                                                    {h}
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {results.map((p, i) => (
+                                            <tr key={p.id} className={`transition-colors ${i % 2 === 0 ? t.rowEven(dark) : t.rowOdd(dark)} ${t.rowHover(dark)}`}>
+                                                <td className={`px-4 py-4 first:pl-5 whitespace-nowrap ${t.cell(dark)} ${t.cod(dark)} text-base`}>{p.cod}</td>
+                                                <td className={`px-4 py-4 whitespace-nowrap ${t.cell(dark)}`}>{p.pa ?? '—'}</td>
+                                                <td className={`px-4 py-4 ${t.cell(dark)} font-medium`}>{p.descricao ?? '—'}</td>
+                                                <td className={`px-4 py-4 whitespace-nowrap ${t.cell(dark)}`}>{p.grupo ?? '—'}</td>
+                                                <td className={`px-4 py-4 whitespace-nowrap ${t.cell(dark)} font-semibold`}>{p.montadora ?? '—'}</td>
+                                                <td className={`px-4 py-4 max-w-[160px] ${t.cell(dark)}`}>{p.veiculo ?? '—'}</td>
+                                                <td className={`px-4 py-4 max-w-[200px] ${t.cell(dark)}`}>{p.motor ?? '—'}</td>
+                                                <td className={`px-4 py-4 whitespace-nowrap ${t.cell(dark)}`}>{p.ano_aplicacao ?? '—'}</td>
+                                                <td className={`px-4 py-4 whitespace-nowrap ${t.cell(dark)}`}>{p.sobremedida ?? '—'}</td>
+                                                <td className={`px-4 py-4 last:pr-5 whitespace-nowrap ${t.cell(dark)}`}>
+                                                    {p.lancamentos && (
+                                                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${t.badge(dark)}`}>
+                                                            <Sparkles className="w-3 h-3" /> Novo
+                                                        </span>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        {/* Mobile Cards */}
+                        <div className="sm:hidden space-y-4">
+                            {results.map(p => (
+                                <div key={p.id} className={`${t.card(dark)} p-5`}>
+                                    <div className="flex items-start justify-between gap-3 mb-3">
+                                        <div>
+                                            <span className={`text-xl ${t.cod(dark)}`}>{p.cod}</span>
+                                            {p.pa && <span className={`ml-2 text-sm ${t.muted(dark)}`}>{p.pa}</span>}
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1.5">
                                             {p.grupo && (
-                                                <span className="text-[10px] font-bold bg-white/10 text-slate-300 px-2 py-0.5 rounded-md whitespace-nowrap">
+                                                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${dark ? 'bg-[#333] text-[#ccc]' : 'bg-[#e8e8e8] text-[#555]'}`}>
                                                     {p.grupo}
                                                 </span>
                                             )}
-                                        </div>
-                                        {p.descricao && (
-                                            <p className="text-sm font-medium text-white mb-3">{p.descricao}</p>
-                                        )}
-                                        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                                            {p.montadora && (
-                                                <div>
-                                                    <span className="text-slate-500 uppercase tracking-wide text-[10px]">Montadora</span>
-                                                    <p className="text-slate-300 font-medium mt-0.5">{p.montadora}</p>
-                                                </div>
-                                            )}
-                                            {p.veiculo && (
-                                                <div>
-                                                    <span className="text-slate-500 uppercase tracking-wide text-[10px]">Veículo</span>
-                                                    <p className="text-slate-300 font-medium mt-0.5">{p.veiculo}</p>
-                                                </div>
-                                            )}
-                                            {p.motor && (
-                                                <div className="col-span-2">
-                                                    <span className="text-slate-500 uppercase tracking-wide text-[10px]">Motor</span>
-                                                    <p className="text-slate-300 font-medium mt-0.5">{p.motor}</p>
-                                                </div>
-                                            )}
-                                            {p.ano_aplicacao && (
-                                                <div>
-                                                    <span className="text-slate-500 uppercase tracking-wide text-[10px]">Ano</span>
-                                                    <p className="text-slate-300 font-medium mt-0.5">{p.ano_aplicacao}</p>
-                                                </div>
-                                            )}
-                                            {p.sobremedida && (
-                                                <div>
-                                                    <span className="text-slate-500 uppercase tracking-wide text-[10px]">Sobremedida</span>
-                                                    <p className="text-slate-300 font-medium mt-0.5">{p.sobremedida}</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                        {p.lancamentos && (
-                                            <div className="mt-2 pt-2 border-t border-white/5">
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                                                    <Sparkles className="w-2.5 h-2.5" />Lançamento
+                                            {p.lancamentos && (
+                                                <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${t.badge(dark)}`}>
+                                                    <Sparkles className="w-3 h-3" /> Novo
                                                 </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {p.descricao && <p className="text-base font-semibold mb-4">{p.descricao}</p>}
+                                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                                        {[
+                                            { label: 'Montadora', val: p.montadora },
+                                            { label: 'Veículo', val: p.veiculo },
+                                            { label: 'Ano', val: p.ano_aplicacao },
+                                            { label: 'Sobremedida', val: p.sobremedida },
+                                        ].filter(r => r.val).map(r => (
+                                            <div key={r.label}>
+                                                <p className={`text-xs font-bold uppercase tracking-wider mb-0.5 ${t.muted(dark)}`}>{r.label}</p>
+                                                <p className="text-base font-medium">{r.val}</p>
+                                            </div>
+                                        ))}
+                                        {p.motor && (
+                                            <div className="col-span-2">
+                                                <p className={`text-xs font-bold uppercase tracking-wider mb-0.5 ${t.muted(dark)}`}>Motor</p>
+                                                <p className="text-base font-medium">{p.motor}</p>
                                             </div>
                                         )}
                                     </div>
-                                ))}
-                            </div>
-                        </>
-                    )}
-                </div>
+                                </div>
+                            ))}
+                        </div>
+                    </>
+                )}
             </div>
 
-            {/* Footer */}
-            <footer className="border-t border-white/8 py-4 px-6 text-center z-10">
-                <p className="text-[11px] text-slate-600">
+            {/* ── Footer ───────────────────────────────────────────────── */}
+            <footer className={`border-t ${t.divider(dark)} py-5 px-6 text-center mt-8`}>
+                <p className={`text-sm ${t.muted(dark)}`}>
                     © {new Date().getFullYear()} Kalled Pistões · Todos os direitos reservados
                 </p>
             </footer>
