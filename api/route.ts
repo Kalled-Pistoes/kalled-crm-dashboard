@@ -802,7 +802,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     const cl = (v:any) => v ? String(v).trim().replace(/\r\n/g,' / ').replace(/\n/g,' / ')||null : null;
                     const cn = (v:any) => { const n = parseFloat(String(v||'').replace(',','.')); return isNaN(n)?null:n; };
                     const lancRaw = cl(col(r,'LANÇAMENTOS','LANÇAMENTO','Lançamentos','Lançamento','lancamentos','lancamento','LANCAMENTOS','LANCAMENTO'));
-                    const lancamentos = lancRaw ? !['nao','não','n','false','0','no',''].includes(lancRaw.toLowerCase().trim()) : false;
+                    const lancamentos = lancRaw ? ['lançamento','lancamento','sim','yes','s','true','1','novo','new','launch'].includes(lancRaw.toLowerCase().trim()) : false;
                     const qtdRaw = cn(col(r,'QUANTIDADE DE PISTÕES','QUANTIDADE DE PISTOES','Qtd Pistões','Qtd Pistoes','qtd_pistoes'));
                     return {
                         cod,
