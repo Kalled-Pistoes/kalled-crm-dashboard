@@ -86,9 +86,15 @@ export default function Catalogo() {
         if (!hasFilter) return;
         setLoading(true); setError('');
         try {
+            const ref = filters.ref.trim();
+            if (ref && ref.length < 3) {
+                setError('Digite ao menos 3 caracteres para buscar por código de referência.');
+                setLoading(false);
+                return;
+            }
             let query = supabase.from('catalogo_produtos').select('*').order('cod').limit(200);
             if (filters.cod.trim())     query = query.ilike('cod', `%${filters.cod.trim()}%`);
-            if (filters.ref.trim())     query = query.or(`ref_metal_leve_sulloy.ilike.%${filters.ref.trim()}%,ref_anel_kalled.ilike.%${filters.ref.trim()}%`);
+            if (ref)                    query = query.or(`ref_metal_leve_sulloy.ilike.%${ref}%,ref_anel_kalled.ilike.%${ref}%`);
             if (filters.montadora)      query = query.eq('montadora', filters.montadora);
             if (filters.veiculo.trim()) query = query.ilike('veiculo', `%${filters.veiculo.trim()}%`);
             if (filters.motor.trim())   query = query.ilike('motor', `%${filters.motor.trim()}%`);
