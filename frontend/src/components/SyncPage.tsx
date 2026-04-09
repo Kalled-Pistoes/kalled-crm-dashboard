@@ -107,11 +107,12 @@ export default function SyncPage() {
     };
 
     const handlePreview = async () => {
-        if (!vendasFile) { setError('Selecione o arquivo "Base de Dados de Vendas.xlsx"'); return; }
+        if (!vendasFile && !catalogoFile) { setError('Selecione ao menos um arquivo para visualizar'); return; }
         setPreviewing(true); setError(null); setPreview(null); setResult(null);
         try {
             const vendas = vendasFile ? await toBase64(vendasFile) : undefined;
-            setPreview(await post('sync/preview', { vendas }));
+            const catalogo = catalogoFile ? await toBase64(catalogoFile) : undefined;
+            setPreview(await post('sync/preview', { vendas, catalogo }));
         } catch (e: any) { setError(e.message); }
         finally { setPreviewing(false); }
     };
@@ -150,7 +151,7 @@ export default function SyncPage() {
             <div className="flex gap-3 mb-4">
                 <button
                     onClick={handlePreview}
-                    disabled={previewing || loading || !vendasFile}
+                    disabled={previewing || loading || (!vendasFile && !catalogoFile)}
                     className="flex-1 py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2
                         bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed text-white"
                 >

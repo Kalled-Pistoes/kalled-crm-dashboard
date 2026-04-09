@@ -629,14 +629,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             };
             // ── preview (não salva nada, apenas mostra o que foi lido) ───────
             if (s1 === 'preview') {
-                const wbPrev = await readXlsx(vendasB64);
                 const preview: Record<string, any[]> = {};
-                for (const sheet of ['Metas Representantes','Clientes','Cross','Vendas','Vendas Representantes','Visitas Tecnicas']) {
-                    preview[sheet] = getSheet(wbPrev, sheet).slice(0, 5);
-                }
                 const counts: Record<string, number> = {};
-                for (const sheet of Object.keys(preview)) counts[sheet] = getSheet(wbPrev, sheet).length;
-                return res.json({ sheets: Object.keys(wbPrev.Sheets), counts, preview });
+                let sheets: string[] = [];
+
+                if (vendasB64) {
+                    const wbPrev = await readXlsx(vendasB64);
+                    sheets = Object.keys(wbPrev.Sheets);
+                    for (const sheet of ['Metas Representantes','Clientes','Cross','Vendas','Vendas Representantes','Visitas Tecnicas']) {
+                        preview[sheet] = getSheet(wbPrev, sheet).slice(0, 5);
+                        counts[sheet] = getSheet(wbPrev, sheet).length;
+                    }
+                }
+
+                if (catalogoB64) {
+                    const normKey2 = (s: string) => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+                    const wbCatP = await readXlsx(catalogoB64);
+                    const sheetCatP = wbCatP.Sheets[wbCatP.SheetNames[0]];
+                    const tryRangeP = (range: number): any[] => {
+                        try { return XLSX.utils.sheet_to_json(sheetCatP, { range, raw: false, defval: null }); } catch { return []; }
+                    };
+                    const hasCodP = (rows: any[]) => rows.length > 0 && Object.keys(rows[0]).some(k => ['cod','codigo','código'].includes(normKey2(k)));
+                    let rawCatP = tryRangeP(0);
+                    if (!hasCodP(rawCatP)) rawCatP = tryRangeP(1);
+                    if (!hasCodP(rawCatP)) rawCatP = tryRangeP(2);
+                    const detectedRange = hasCodP(tryRangeP(0)) ? 0 : hasCodP(tryRangeP(1)) ? 1 : 2;
+                    preview['Catálogo'] = rawCatP.slice(0, 5);
+                    counts['Catálogo'] = rawCatP.length;
+                    sheets = [...sheets, ...wbCatP.SheetNames];
+                    (counts as any)['_catalogo_range_detectado'] = detectedRange;
+                }
+
+                return res.json({ sheets, counts, preview });
             }
 
             let repsCount = 0, cliCount = 0, prodCount = 0, vendasCount = 0, vrCount = 0, visitasCount = 0;
@@ -749,15 +773,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (catalogoB64) {
                 const wbCat = await readXlsx(catalogoB64);
                 const sheetCat = wbCat.Sheets[wbCat.SheetNames[0]];
-                const rawCat: any[] = XLSX.utils.sheet_to_json(sheetCat, { range: 1, raw: false, defval: null });
+
+                // Normaliza chave de coluna: remove acentos, lowercase, trim
+                const normKey = (s: string) => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+
+                // Auto-detecta range: tenta range:0 e range:1, usa o que tiver coluna "cod"
+                const tryRange = (range: number): any[] => {
+                    try { return XLSX.utils.sheet_to_json(sheetCat, { range, raw: false, defval: null }); }
+                    catch { return []; }
+                };
+                const hasCod = (rows: any[]) => rows.length > 0 && Object.keys(rows[0]).some(k => ['cod','codigo','código'].includes(normKey(k)));
+                let rawCat = tryRange(0);
+                if (!hasCod(rawCat)) rawCat = tryRange(1);
+                if (!hasCod(rawCat)) rawCat = tryRange(2); // fallback para planilhas com 2 linhas de título
+
+                // Lookup normalizado de coluna
+                const col = (row: any, ...names: string[]): any => {
+                    const normNames = names.map(normKey);
+                    for (const k of Object.keys(row)) {
+                        if (normNames.includes(normKey(k))) return row[k];
+                    }
+                    return null;
+                };
+
                 const catRows = rawCat.map((r:any) => {
-                    const cod = String(r['CÓD']||r['COD']||r['Cód']||'').trim();
+                    const cod = String(col(r,'CÓD','COD','Cód','Cod','Código','CÓDIGO','codigo')||'').trim();
                     if (!cod) return null;
                     const cl = (v:any) => v ? String(v).trim().replace(/\r\n/g,' / ').replace(/\n/g,' / ')||null : null;
-                    const cn = (v:any) => { const n = parseFloat(v); return isNaN(n)?null:n; };
-                    const lancRaw = cl(r['LANÇAMENTOS']||r['LANÇAMENTO']||r['Lançamentos']||r['Lançamento']||r['lancamentos']||r['lancamento']||r['LANCAMENTOS']||r['LANCAMENTO']);
+                    const cn = (v:any) => { const n = parseFloat(String(v||'').replace(',','.')); return isNaN(n)?null:n; };
+                    const lancRaw = cl(col(r,'LANÇAMENTOS','LANÇAMENTO','Lançamentos','Lançamento','lancamentos','lancamento','LANCAMENTOS','LANCAMENTO'));
                     const lancamentos = lancRaw ? !['nao','não','n','false','0','no',''].includes(lancRaw.toLowerCase().trim()) : false;
-                    return { cod, pa: cl(r['PA']), descricao: cl(r['DESCRIÇÃO']), grupo: cl(r['Grupo']||r['GRUPO']), montadora: cl(r['MONTADORA']), veiculo: cl(r['VEICULO']||r['VEÍCULO']), ano_aplicacao: cl(r['ANO DE APLICAÇÃO']), motor: cl(r['MOTOR']), sobremedida: cl(r['SOBREMEDIDA']), qtd_pistoes: cn(r['QUANTIDADE DE PISTÕES'])!==null?Math.round(cn(r['QUANTIDADE DE PISTÕES'])!):null, diametro_cilindro: cn(r['DIAMETRO DO CILINDRO']), ref_metal_leve_sulloy: cl(r['CÓD REF METAL LEVE / SULOY']||r['CÓD REF METAL LEVE / SULLOY']), ref_anel_kalled: cl(r['REF ANEL KALLED']), lancamentos, updated_at: new Date().toISOString() };
+                    const qtdRaw = cn(col(r,'QUANTIDADE DE PISTÕES','QUANTIDADE DE PISTOES','Qtd Pistões','Qtd Pistoes','qtd_pistoes'));
+                    return {
+                        cod,
+                        pa: cl(col(r,'PA')),
+                        descricao: cl(col(r,'DESCRIÇÃO','DESCRICAO','Descrição','Descricao','descricao')),
+                        grupo: cl(col(r,'Grupo','GRUPO','grupo')),
+                        montadora: cl(col(r,'MONTADORA','Montadora','montadora')),
+                        veiculo: cl(col(r,'VEICULO','VEÍCULO','Veículo','veiculo')),
+                        ano_aplicacao: cl(col(r,'ANO DE APLICAÇÃO','ANO DE APLICACAO','Ano de Aplicação','ano_aplicacao')),
+                        motor: cl(col(r,'MOTOR','Motor','motor')),
+                        sobremedida: cl(col(r,'SOBREMEDIDA','Sobremedida','sobremedida')),
+                        qtd_pistoes: qtdRaw !== null ? Math.round(qtdRaw) : null,
+                        diametro_cilindro: cn(col(r,'DIAMETRO DO CILINDRO','DIÂMETRO DO CILINDRO','diametro_cilindro')),
+                        ref_metal_leve_sulloy: cl(col(r,'CÓD REF METAL LEVE / SULOY','CÓD REF METAL LEVE / SULLOY','COD REF METAL LEVE / SULOY','ref_metal_leve_sulloy')),
+                        ref_anel_kalled: cl(col(r,'REF ANEL KALLED','ref_anel_kalled')),
+                        lancamentos,
+                        updated_at: new Date().toISOString()
+                    };
                 }).filter(Boolean);
                 const { error: delCat } = await supabase.from('catalogo_produtos').delete().neq('id','00000000-0000-0000-0000-000000000000');
                 if (delCat) throw new Error(`Truncate catalogo_produtos: ${delCat.message}`);
