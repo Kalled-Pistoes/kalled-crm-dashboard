@@ -796,6 +796,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     return null;
                 };
 
+                // Normaliza para Title Case: "FORD" → "Ford", "volkswagen" → "Volkswagen"
+                const toTitleCase = (v: any): string | null => {
+                    if (!v) return null;
+                    const s = String(v).trim();
+                    if (!s) return null;
+                    return s.toLowerCase().replace(/(?:^|\s|\/|-)\S/g, c => c.toUpperCase());
+                };
+
                 const catRows = rawCat.map((r:any) => {
                     const cod = String(col(r,'CÓD','COD','Cód','Cod','Código','CÓDIGO','codigo')||'').trim();
                     if (!cod) return null;
@@ -809,7 +817,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         pa: cl(col(r,'PA')),
                         descricao: cl(col(r,'DESCRIÇÃO','DESCRICAO','Descrição','Descricao','descricao')),
                         grupo: cl(col(r,'Grupo','GRUPO','grupo')),
-                        montadora: cl(col(r,'MONTADORA','Montadora','montadora')),
+                        montadora: toTitleCase(col(r,'MONTADORA','Montadora','montadora')),
                         veiculo: cl(col(r,'VEICULO','VEÍCULO','Veículo','veiculo')),
                         ano_aplicacao: cl(col(r,'ANO DE APLICAÇÃO','ANO DE APLICACAO','Ano de Aplicação','ano_aplicacao')),
                         motor: cl(col(r,'MOTOR','Motor','motor')),
