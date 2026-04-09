@@ -43,8 +43,8 @@ const t = {
     rowHover:   (d: boolean) => d ? 'hover:bg-[#2d2d35]' : 'hover:bg-[#ffeaea]',
     cell:       (d: boolean) => d ? 'text-[#d0d0d8] border-b border-[#2e2e34]' : 'text-[#333] border-b border-[#e8e8e8]',
     badge:      (d: boolean) => d
-        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-        : 'bg-amber-50 text-amber-700 border border-amber-300',
+        ? 'bg-green-500/20 text-green-400 border border-green-500/40'
+        : 'bg-green-50 text-green-700 border border-green-300',
     divider:    (d: boolean) => d ? 'border-[#333]' : 'border-[#d0d0d0]',
     muted:      (d: boolean) => d ? 'text-[#666]' : 'text-[#888]',
     cod:        (d: boolean) => d ? 'text-[#e05050] font-bold font-mono' : 'text-[#C01717] font-bold font-mono',
@@ -188,103 +188,87 @@ export default function Catalogo() {
                     )}
 
                     <form onSubmit={handleSearch}>
-                        {/* Linha 1 */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-5">
-                            <div>
-                                <label className={`block mb-2 ${t.label(dark)}`}>Nº do Produto / Código</label>
-                                <input
-                                    type="text"
-                                    value={filters.cod}
-                                    onChange={e => set('cod', e.target.value)}
-                                    placeholder="Ex: P2110"
-                                    className={inputCls}
-                                />
-                            </div>
-                            <div>
-                                <label className={`block mb-2 ${t.label(dark)}`}>Código de Referência</label>
-                                <input
-                                    type="text"
-                                    value={filters.ref}
-                                    onChange={e => set('ref', e.target.value)}
-                                    placeholder="Ex: ML1234, 123456..."
-                                    className={inputCls}
-                                />
-                                <p className={`mt-1 text-xs ${t.muted(dark)}`}>Busca em todas as referências de concorrentes</p>
-                            </div>
-                            <div>
-                                <label className={`block mb-2 ${t.label(dark)}`}>Montadora</label>
-                                <select
-                                    value={filters.montadora}
-                                    onChange={e => set('montadora', e.target.value)}
-                                    disabled={catalogoConfigured && !optionsLoaded}
-                                    className={`${inputCls} cursor-pointer disabled:opacity-50`}
-                                    style={{ backgroundColor: selectBg }}
-                                >
-                                    <option value="">Todas as Montadoras</option>
-                                    {montadoras.map(m => <option key={m} value={m}>{m}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className={`block mb-2 ${t.label(dark)}`}>Veículo / Modelo</label>
-                                <input
-                                    type="text"
-                                    value={filters.veiculo}
-                                    onChange={e => set('veiculo', e.target.value)}
-                                    placeholder="Ex: Gol, Palio, Uno..."
-                                    className={inputCls}
-                                />
+                        {/* Seção 1 — Identificação do Produto */}
+                        <div className={`mb-1 pb-1`}>
+                            <p className={`text-xs font-black uppercase tracking-widest mb-3 ${t.muted(dark)}`}>Identificação do Produto</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label className={`block mb-1.5 ${t.label(dark)}`}>Nº do Produto / Código</label>
+                                    <input type="text" value={filters.cod} onChange={e => set('cod', e.target.value)}
+                                        placeholder="Ex: P2110" className={inputCls} />
+                                </div>
+                                <div>
+                                    <label className={`block mb-1.5 ${t.label(dark)}`}>Código de Referência de Concorrente</label>
+                                    <input type="text" value={filters.ref} onChange={e => set('ref', e.target.value)}
+                                        placeholder="Ex: 4950, ML1234..." className={inputCls} />
+                                </div>
                             </div>
                         </div>
 
-                        {/* Linha 2 */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 mb-6">
-                            <div>
-                                <label className={`block mb-2 ${t.label(dark)}`}>Motor</label>
-                                <input
-                                    type="text"
-                                    value={filters.motor}
-                                    onChange={e => set('motor', e.target.value)}
-                                    placeholder="Ex: 1.0 8V, EA111..."
-                                    className={inputCls}
-                                />
+                        {/* Divisor */}
+                        <div className={`border-t my-5 ${t.divider(dark)}`} />
+
+                        {/* Seção 2 — Dados do Veículo */}
+                        <div className="mb-1">
+                            <p className={`text-xs font-black uppercase tracking-widest mb-3 ${t.muted(dark)}`}>Dados do Veículo</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div>
+                                    <label className={`block mb-1.5 ${t.label(dark)}`}>Montadora</label>
+                                    <select value={filters.montadora} onChange={e => set('montadora', e.target.value)}
+                                        disabled={catalogoConfigured && !optionsLoaded}
+                                        className={`${inputCls} cursor-pointer disabled:opacity-50`} style={{ backgroundColor: selectBg }}>
+                                        <option value="">Todas</option>
+                                        {montadoras.map(m => <option key={m} value={m}>{m}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className={`block mb-1.5 ${t.label(dark)}`}>Veículo / Modelo</label>
+                                    <input type="text" value={filters.veiculo} onChange={e => set('veiculo', e.target.value)}
+                                        placeholder="Ex: Gol, Palio, Uno..." className={inputCls} />
+                                </div>
+                                <div>
+                                    <label className={`block mb-1.5 ${t.label(dark)}`}>Motor</label>
+                                    <input type="text" value={filters.motor} onChange={e => set('motor', e.target.value)}
+                                        placeholder="Ex: 1.0 8V, EA111..." className={inputCls} />
+                                </div>
                             </div>
+                        </div>
+
+                        {/* Divisor */}
+                        <div className={`border-t my-5 ${t.divider(dark)}`} />
+
+                        {/* Seção 3 — Tipo + Lançamentos */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-1">
                             <div>
-                                <label className={`block mb-2 ${t.label(dark)}`}>Grupo / Tipo</label>
-                                <select
-                                    value={filters.grupo}
-                                    onChange={e => set('grupo', e.target.value)}
+                                <label className={`block mb-1.5 ${t.label(dark)}`}>Grupo / Tipo</label>
+                                <select value={filters.grupo} onChange={e => set('grupo', e.target.value)}
                                     disabled={catalogoConfigured && !optionsLoaded}
-                                    className={`${inputCls} cursor-pointer disabled:opacity-50`}
-                                    style={{ backgroundColor: selectBg }}
-                                >
+                                    className={`${inputCls} cursor-pointer disabled:opacity-50`} style={{ backgroundColor: selectBg }}>
                                     <option value="">Todos os Grupos</option>
                                     {grupos.map(g => <option key={g} value={g}>{g}</option>)}
                                 </select>
                             </div>
-                            {/* Toggle lançamentos */}
-                            <div className="flex items-end pb-1">
-                                <button
-                                    type="button"
-                                    onClick={() => setFilters(p => ({ ...p, lancamentos: !p.lancamentos }))}
+                            <div className="flex items-end">
+                                <button type="button"
+                                    onClick={() => setFilters((p: Filters) => ({ ...p, lancamentos: !p.lancamentos }))}
                                     className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg border-2 text-base font-semibold transition-all ${
                                         filters.lancamentos
-                                            ? 'border-amber-500 bg-amber-500/10 text-amber-600'
-                                            : `border-2 ${dark ? 'border-[#444] text-[#888]' : 'border-[#ccc] text-[#888]'}`
-                                    }`}
-                                >
-                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                                        filters.lancamentos ? 'bg-amber-500 border-amber-500' : dark ? 'border-[#555]' : 'border-[#bbb]'
+                                            ? 'border-green-500 bg-green-500/10 text-green-600'
+                                            : `${dark ? 'border-[#444] text-[#888]' : 'border-[#ccc] text-[#888]'}`
+                                    }`}>
+                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                                        filters.lancamentos ? 'bg-green-500 border-green-500' : dark ? 'border-[#555]' : 'border-[#bbb]'
                                     }`}>
                                         {filters.lancamentos && <span className="text-white text-xs font-black">✓</span>}
                                     </div>
-                                    <Sparkles className={`w-4 h-4 flex-shrink-0 ${filters.lancamentos ? 'text-amber-500' : ''}`} />
+                                    <Sparkles className={`w-4 h-4 flex-shrink-0 ${filters.lancamentos ? 'text-green-500' : ''}`} />
                                     Apenas Lançamentos
                                 </button>
                             </div>
                         </div>
 
                         {/* Botões */}
-                        <div className={`flex gap-3 pt-5 border-t ${t.divider(dark)}`}>
+                        <div className={`flex gap-3 pt-5 mt-4 border-t ${t.divider(dark)}`}>
                             <button
                                 type="submit"
                                 disabled={loading || !catalogoConfigured}
@@ -350,104 +334,90 @@ export default function Catalogo() {
                             </p>
                         </div>
 
-                        {/* Desktop Table */}
-                        <div className={`hidden sm:block ${t.card(dark)} overflow-hidden p-0`}>
-                            <div className="overflow-x-auto">
-                                <table className="w-full border-collapse" style={{ fontSize: '15px' }}>
-                                    <thead>
-                                        <tr className={t.thead(dark)}>
-                                            {['Código','PA','Descrição','Grupo','Montadora','Veículo','Motor','Ano','Sobremedida','Ref. Concorrente','Lançamento'].map(h => (
-                                                <th key={h} className="text-left px-4 py-4 font-bold uppercase tracking-wider text-sm whitespace-nowrap first:pl-5 last:pr-5">
-                                                    {h}
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {results.map((p, i) => (
-                                            <tr key={p.id} className={`transition-colors ${i % 2 === 0 ? t.rowEven(dark) : t.rowOdd(dark)} ${t.rowHover(dark)}`}>
-                                                <td className={`px-4 py-4 first:pl-5 whitespace-nowrap ${t.cell(dark)} ${t.cod(dark)} text-base`}>{p.cod}</td>
-                                                <td className={`px-4 py-4 whitespace-nowrap ${t.cell(dark)}`}>{p.pa ?? '—'}</td>
-                                                <td className={`px-4 py-4 ${t.cell(dark)} font-medium`}>{p.descricao ?? '—'}</td>
-                                                <td className={`px-4 py-4 whitespace-nowrap ${t.cell(dark)}`}>{p.grupo ?? '—'}</td>
-                                                <td className={`px-4 py-4 whitespace-nowrap ${t.cell(dark)} font-semibold`}>{p.montadora ?? '—'}</td>
-                                                <td className={`px-4 py-4 max-w-[160px] ${t.cell(dark)}`}>{p.veiculo ?? '—'}</td>
-                                                <td className={`px-4 py-4 max-w-[200px] ${t.cell(dark)}`}>{p.motor ?? '—'}</td>
-                                                <td className={`px-4 py-4 whitespace-nowrap ${t.cell(dark)}`}>{p.ano_aplicacao ?? '—'}</td>
-                                                <td className={`px-4 py-4 whitespace-nowrap ${t.cell(dark)}`}>{p.sobremedida ?? '—'}</td>
-                                                <td className={`px-4 py-4 max-w-[180px] ${t.cell(dark)}`}>
-                                                    {(p.ref_metal_leve_sulloy || p.ref_anel_kalled) ? (
-                                                        <div className="space-y-0.5">
-                                                            {p.ref_metal_leve_sulloy && <span className={`block text-xs font-mono ${dark ? 'text-sky-300' : 'text-sky-700'}`}>{p.ref_metal_leve_sulloy}</span>}
-                                                            {p.ref_anel_kalled && <span className={`block text-xs font-mono ${dark ? 'text-violet-300' : 'text-violet-700'}`}>{p.ref_anel_kalled}</span>}
-                                                        </div>
-                                                    ) : '—'}
-                                                </td>
-                                                <td className={`px-4 py-4 last:pr-5 whitespace-nowrap ${t.cell(dark)}`}>
-                                                    {p.lancamentos && (
-                                                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full ${t.badge(dark)}`}>
-                                                            <Sparkles className="w-3 h-3" /> Novo
-                                                        </span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* Mobile Cards */}
-                        <div className="sm:hidden space-y-4">
+                        {/* Cards — desktop e mobile unificados */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
                             {results.map(p => (
-                                <div key={p.id} className={`${t.card(dark)} p-5`}>
-                                    <div className="flex items-start justify-between gap-3 mb-3">
-                                        <div>
-                                            <span className={`text-xl ${t.cod(dark)}`}>{p.cod}</span>
-                                            {p.pa && <span className={`ml-2 text-sm ${t.muted(dark)}`}>{p.pa}</span>}
+                                <div key={p.id} className={`${t.card(dark)} flex flex-col overflow-hidden`}>
+                                    {/* Cabeçalho vermelho */}
+                                    <div className="bg-[#C01717] px-5 py-4 flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <p className="text-white/70 text-xs font-bold uppercase tracking-wider mb-0.5">Código</p>
+                                            <p className="text-white font-black text-2xl leading-tight font-mono">{p.cod}</p>
+                                            {p.pa && <p className="text-white/60 text-xs font-mono mt-0.5">{p.pa}</p>}
                                         </div>
-                                        <div className="flex flex-col items-end gap-1.5">
-                                            {p.grupo && (
-                                                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${dark ? 'bg-[#333] text-[#ccc]' : 'bg-[#e8e8e8] text-[#555]'}`}>
-                                                    {p.grupo}
-                                                </span>
-                                            )}
+                                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                                             {p.lancamentos && (
                                                 <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${t.badge(dark)}`}>
                                                     <Sparkles className="w-3 h-3" /> Novo
                                                 </span>
                                             )}
+                                            {p.grupo && (
+                                                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-white/20 text-white">
+                                                    {p.grupo}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
-                                    {p.descricao && <p className="text-base font-semibold mb-4">{p.descricao}</p>}
-                                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                                        {[
-                                            { label: 'Montadora', val: p.montadora },
-                                            { label: 'Veículo', val: p.veiculo },
-                                            { label: 'Ano', val: p.ano_aplicacao },
-                                            { label: 'Sobremedida', val: p.sobremedida },
-                                        ].filter(r => r.val).map(r => (
-                                            <div key={r.label}>
-                                                <p className={`text-xs font-bold uppercase tracking-wider mb-0.5 ${t.muted(dark)}`}>{r.label}</p>
-                                                <p className="text-base font-medium">{r.val}</p>
-                                            </div>
-                                        ))}
-                                        {p.motor && (
-                                            <div className="col-span-2">
-                                                <p className={`text-xs font-bold uppercase tracking-wider mb-0.5 ${t.muted(dark)}`}>Motor</p>
-                                                <p className="text-base font-medium">{p.motor}</p>
+
+                                    {/* Descrição */}
+                                    <div className={`px-5 py-3 border-b ${t.divider(dark)}`}>
+                                        <p className="text-base font-bold leading-snug">
+                                            {p.descricao ?? '—'}
+                                        </p>
+                                    </div>
+
+                                    {/* Dados do veículo */}
+                                    <div className="px-5 py-4 flex-1 grid grid-cols-2 gap-x-4 gap-y-3">
+                                        {p.montadora && (
+                                            <div>
+                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Montadora</p>
+                                                <p className="text-base font-semibold">{p.montadora}</p>
                                             </div>
                                         )}
-                                        {(p.ref_metal_leve_sulloy || p.ref_anel_kalled) && (
+                                        {p.veiculo && (
+                                            <div>
+                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Veículo</p>
+                                                <p className="text-base font-semibold">{p.veiculo}</p>
+                                            </div>
+                                        )}
+                                        {p.ano_aplicacao && (
+                                            <div>
+                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Ano</p>
+                                                <p className="text-base font-semibold">{p.ano_aplicacao}</p>
+                                            </div>
+                                        )}
+                                        {p.sobremedida && (
+                                            <div>
+                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Sobremedida</p>
+                                                <p className="text-base font-semibold">{p.sobremedida}</p>
+                                            </div>
+                                        )}
+                                        {p.motor && (
                                             <div className="col-span-2">
-                                                <p className={`text-xs font-bold uppercase tracking-wider mb-1 ${t.muted(dark)}`}>Ref. Concorrente</p>
-                                                <div className="space-y-0.5">
-                                                    {p.ref_metal_leve_sulloy && <p className={`text-sm font-mono ${dark ? 'text-sky-300' : 'text-sky-700'}`}>{p.ref_metal_leve_sulloy}</p>}
-                                                    {p.ref_anel_kalled && <p className={`text-sm font-mono ${dark ? 'text-violet-300' : 'text-violet-700'}`}>{p.ref_anel_kalled}</p>}
-                                                </div>
+                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Motor</p>
+                                                <p className="text-base font-semibold">{p.motor}</p>
                                             </div>
                                         )}
                                     </div>
+
+                                    {/* Referências de concorrentes — rodapé */}
+                                    {(p.ref_metal_leve_sulloy || p.ref_anel_kalled) && (
+                                        <div className={`px-5 py-3 border-t ${t.divider(dark)} ${dark ? 'bg-[#1a1a1e]' : 'bg-[#f5f5f5]'}`}>
+                                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1.5 ${t.muted(dark)}`}>Ref. Concorrente</p>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {p.ref_metal_leve_sulloy && (
+                                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${dark ? 'bg-sky-500/15 text-sky-300' : 'bg-sky-100 text-sky-700'}`}>
+                                                        {p.ref_metal_leve_sulloy}
+                                                    </span>
+                                                )}
+                                                {p.ref_anel_kalled && (
+                                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${dark ? 'bg-violet-500/15 text-violet-300' : 'bg-violet-100 text-violet-700'}`}>
+                                                        {p.ref_anel_kalled}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
