@@ -71,7 +71,7 @@ export default function Layout() {
                     {/* Kalled Logo */}
                     <div className="flex items-center gap-3">
                         <img
-                            src="/Kalled White.png"
+                            src="/Kalled%20White.png"
                             alt="Kalled"
                             className="h-8 object-contain"
                             onError={e => {
