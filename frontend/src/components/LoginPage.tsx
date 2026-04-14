@@ -47,7 +47,7 @@ export default function LoginPage() {
                 <div className="text-center mb-8">
                     <div className="flex justify-center mb-4">
                         <img
-                            src="/logo-kalled.png"
+                            src="/Kalled%20White.png"
                             alt="Kalled Pistões"
                             className="h-14 object-contain"
                             onError={e => {

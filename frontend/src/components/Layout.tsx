@@ -73,7 +73,7 @@ export default function Layout() {
                         <img
                             src="/Kalled%20White.png"
                             alt="Kalled"
-                            className="h-8 object-contain"
+                            className="h-10 object-contain"
                             onError={e => {
                                 e.currentTarget.style.display = 'none';
                                 const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
