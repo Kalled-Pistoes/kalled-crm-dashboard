@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, Lock, ChevronRight, Package, AlertCircle, Sun, Moon, Sparkles } from 'lucide-react';
+import { Search, X, Lock, Package, AlertCircle, Sun, Moon, Sparkles } from 'lucide-react';
 import { supabase, catalogoConfigured, type CatalogoProduto } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -153,14 +153,6 @@ export default function Catalogo() {
                         <span className="hidden sm:inline">{dark ? 'Modo Claro' : 'Modo Escuro'}</span>
                     </button>
 
-                    {user && (
-                        <button
-                            onClick={() => navigate('/dashboard')}
-                            className="hidden sm:flex items-center gap-1 text-sm font-semibold text-[#C01717] hover:opacity-80 transition-opacity"
-                        >
-                            Dashboard <ChevronRight className="w-4 h-4" />
-                        </button>
-                    )}
                     <button
                         onClick={() => navigate('/login')}
                         className={`flex items-center gap-2 text-sm font-semibold px-3 py-2 rounded-lg border transition-all ${t.divider(dark)} ${t.toggleBg(dark)}`}
