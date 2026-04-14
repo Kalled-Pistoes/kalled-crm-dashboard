@@ -121,7 +121,7 @@ export default function Catalogo() {
                     <img
                         src={dark ? '/Kalled%20White.png' : '/logo-kalled.png'}
                         alt="Kalled Pistões"
-                        className="h-10 sm:h-12 object-contain"
+                        className="h-12 sm:h-16 object-contain"
                         onError={e => {
                             e.currentTarget.style.display = 'none';
                             const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
