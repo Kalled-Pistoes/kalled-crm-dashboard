@@ -2,7 +2,6 @@ import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, Lock, Package, AlertCircle, Sun, Moon, Sparkles } from 'lucide-react';
 import { supabase, catalogoConfigured, type CatalogoProduto } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
 
 interface Filters {
     cod: string;
@@ -53,7 +52,6 @@ const t = {
 
 export default function Catalogo() {
     const navigate = useNavigate();
-    const { user } = useAuth();
     const { dark, toggle } = useTheme();
 
     const [filters, setFilters] = useState<Filters>(EMPTY);
