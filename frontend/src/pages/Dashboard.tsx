@@ -65,7 +65,7 @@ export default function Dashboard() {
 
     if (loading) return (
         <div className="flex items-center justify-center h-full">
-            <div className="w-10 h-10 border-4 border-brand-600 border-t-transparent rounded-full animate-spin" />
+            <div className="w-10 h-10 border-4 border-[#C01717] border-t-transparent rounded-full animate-spin" />
         </div>
     );
 
@@ -92,7 +92,7 @@ export default function Dashboard() {
 
     // Dados do Gráfico de Rosca (Apenas Top 5 SKUs)
     const donutData = topSkus.map(s => ({ name: s.nome, value: s.quantidade }));
-    const COLORS = ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#10b981'];
+    const COLORS = ['#C01717', '#e05050', '#a01414', '#f97316', '#801010'];
 
 
     return (
@@ -144,7 +144,7 @@ export default function Dashboard() {
                         <div className="flex-1 min-h-[220px]">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={vendasAno} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
                                     <XAxis
                                         dataKey="ano"
                                         axisLine={false}
@@ -154,13 +154,13 @@ export default function Dashboard() {
                                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#64748b' }} tickFormatter={(val) => `R$ ${(val / 1000000).toFixed(1)}M`} />
                                     <Tooltip
                                         cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                        contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.5)', color: '#fff' }}
+                                        contentStyle={{ backgroundColor: '#111113', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.5)', color: '#f0f0f0' }}
                                         itemStyle={{ color: '#fff' }}
                                         formatter={(value: any) => [formatCurrency(value), 'Faturamento']}
                                     />
                                     <Bar dataKey="total" radius={[6, 6, 0, 0]} barSize={40}>
                                         {vendasAno.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.ano === filters.ano ? '#ec4899' : '#6366f1'} fillOpacity={0.8} />
+                                            <Cell key={`cell-${index}`} fill={entry.ano === filters.ano ? '#C01717' : '#a01414'} fillOpacity={entry.ano === filters.ano ? 1 : 0.55} />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -175,14 +175,14 @@ export default function Dashboard() {
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Evolução de Vendas ({filters.ano})</h3>
                             <div className="flex gap-4 text-[9px] font-bold uppercase tracking-widest">
-                                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-brand-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" /> Faturamento</span>
-                                <span className="flex items-center gap-1.5"><div className="w-2 h-0.5 bg-pink-500" /> Meta</span>
+                                <span className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-[#C01717] shadow-[0_0_8px_rgba(192,23,23,0.5)]" /> Faturamento</span>
+                                <span className="flex items-center gap-1.5"><div className="w-2 h-0.5 bg-[#f97316]" /> Meta</span>
                             </div>
                         </div>
                         <div className="flex-1 min-h-0">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={vendasMes} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.04)" />
                                     <XAxis
                                         dataKey="mes"
                                         axisLine={false}
@@ -198,13 +198,13 @@ export default function Dashboard() {
                                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fill: '#64748b' }} tickFormatter={(val) => `R$ ${val / 1000}k`} />
                                     <Tooltip
                                         cursor={{ fill: 'rgba(255,255,255,0.05)' }}
-                                        contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.5)', color: '#fff' }}
+                                        contentStyle={{ backgroundColor: '#111113', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.5)', color: '#f0f0f0' }}
                                         itemStyle={{ color: '#fff' }}
                                         labelFormatter={(label: any) => label}
                                         formatter={(value: any) => [formatCurrency(value), 'Vendas (R$)']}
                                     />
-                                    <Bar dataKey="total" fill="#6366f1" radius={[4, 4, 0, 0]} barSize={20} fillOpacity={0.8} />
-                                    <ReferenceLine y={metaMensal} stroke="#ec4899" strokeDasharray="3 3" label={{ position: 'right', value: 'Meta', fill: '#ec4899', fontSize: 8, fontWeight: 'bold' }} />
+                                    <Bar dataKey="total" fill="#C01717" radius={[4, 4, 0, 0]} barSize={20} fillOpacity={0.85} />
+                                    <ReferenceLine y={metaMensal} stroke="#f97316" strokeDasharray="3 3" label={{ position: 'right', value: 'Meta', fill: '#f97316', fontSize: 8, fontWeight: 'bold' }} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -220,9 +220,9 @@ export default function Dashboard() {
             </div>
 
             {/* Right Sidebar Analysis */}
-            <div className="w-full lg:w-80 bg-slate-900/40 backdrop-blur-3xl border-t lg:border-t-0 lg:border-l border-white/5 p-4 lg:p-6 shadow-2xl flex flex-col gap-6 lg:gap-8 lg:overflow-hidden z-10">
+            <div className="w-full lg:w-80 bg-[#1f1f23]/80 backdrop-blur-3xl border-t lg:border-t-0 lg:border-l border-[#2a2a2a] p-4 lg:p-6 shadow-2xl flex flex-col gap-6 lg:gap-8 lg:overflow-hidden z-10">
                 <div>
-                    <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-brand-400 mb-6 text-center">SKU (Top 5 Qtd)</h3>
+                    <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#C01717] mb-6 text-center">SKU (Top 5 Qtd)</h3>
                     <div className="h-40 relative">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
@@ -240,7 +240,7 @@ export default function Dashboard() {
                                     ))}
                                 </Pie>
                                 <Tooltip
-                                    contentStyle={{ backgroundColor: '#0f172a', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.5)', color: '#fff' }}
+                                    contentStyle={{ backgroundColor: '#111113', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.5)', color: '#f0f0f0' }}
                                     itemStyle={{ color: '#fff' }}
                                     formatter={(value: any) => [Number(value || 0).toLocaleString('pt-BR') + ' un', 'Quantidade']}
                                 />
@@ -261,7 +261,7 @@ export default function Dashboard() {
                                     </div>
                                     <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                                         <div
-                                            className="h-full bg-gradient-to-r from-brand-600 to-brand-400 rounded-full shadow-[0_0_8px_rgba(99,102,241,0.4)]"
+                                            className="h-full bg-gradient-to-r from-[#a01414] to-[#C01717] rounded-full shadow-[0_0_8px_rgba(192,23,23,0.4)]"
                                             style={{ width: `${(item.quantidade / maxVal) * 100}%` }}
                                         />
                                     </div>

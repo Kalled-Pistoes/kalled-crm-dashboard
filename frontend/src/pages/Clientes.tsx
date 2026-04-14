@@ -7,7 +7,7 @@ import { api, Cliente, ClienteVendasMes, ItensNaoComprados, formatCurrency, form
 function ChartTooltipContent({ active, payload, label }: any) {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-slate-900 border border-white/10 rounded-lg px-3 py-2 shadow-xl">
+        <div className="bg-[#111113] border border-white/10 rounded-lg px-3 py-2 shadow-xl">
             <p className="text-xs text-slate-400 mb-1">{label}</p>
             <p className="text-sm font-bold text-white">{formatCurrency(payload[0].value)}</p>
         </div>
@@ -89,7 +89,7 @@ export default function Clientes() {
 
     if (loading) return (
         <div className="flex items-center justify-center h-64">
-            <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-[#C01717] border-t-transparent rounded-full animate-spin" />
         </div>
     );
 
@@ -113,9 +113,9 @@ export default function Clientes() {
                     <h1 className="text-2xl font-bold text-white tracking-tight">Clientes</h1>
                     <p className="text-slate-500 text-sm mt-1 font-medium">{clientes.length} clientes cadastrados</p>
                 </div>
-                <div className="flex items-center gap-2 bg-brand-500/10 border border-brand-500/20 rounded-xl px-4 py-2 backdrop-blur-md">
-                    <Users className="w-4 h-4 text-brand-400" />
-                    <span className="text-brand-300 font-bold">{filtered.length}</span>
+                <div className="flex items-center gap-2 bg-[#C01717]/10 border border-[#C01717]/20 rounded-xl px-4 py-2 backdrop-blur-md">
+                    <Users className="w-4 h-4 text-[#e05050]" />
+                    <span className="text-[#f87171] font-bold">{filtered.length}</span>
                     <span className="text-slate-400 text-sm font-medium">exibidos</span>
                 </div>
             </div>
@@ -123,7 +123,7 @@ export default function Clientes() {
             {/* Filtros */}
             <div className="flex flex-wrap gap-3">
                 <div className="relative flex-1 min-w-[160px] max-w-sm group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-brand-400 transition-colors" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-[#e05050] transition-colors" />
                     <input
                         className="input pl-9"
                         placeholder="Buscar cliente..."
@@ -136,9 +136,9 @@ export default function Clientes() {
                     value={filtroRep}
                     onChange={e => setFiltroRep(e.target.value)}
                 >
-                    <option value="" className="bg-slate-900">Todos os rep.</option>
+                    <option value="" className="bg-[#111113]">Todos os rep.</option>
                     {representantes.map(r => (
-                        <option key={r} value={r} className="bg-slate-900">{r}</option>
+                        <option key={r} value={r} className="bg-[#111113]">{r}</option>
                     ))}
                 </select>
                 <div className="flex rounded-lg border border-white/10 overflow-hidden">
@@ -184,7 +184,7 @@ export default function Clientes() {
                                         <div
                                             key={i}
                                             onClick={() => setSelectedCliente(c)}
-                                            className={`p-4 cursor-pointer transition-all border-l-2 ${isSelected ? 'bg-white/10 border-brand-500' : 'hover:bg-white/5 border-transparent'} group`}
+                                            className={`p-4 cursor-pointer transition-all border-l-2 ${isSelected ? 'bg-white/10 border-[#C01717]' : 'hover:bg-white/5 border-transparent'} group`}
                                         >
                                             <div className="flex justify-between items-start gap-2">
                                                 <div className="min-w-0">
@@ -245,7 +245,7 @@ export default function Clientes() {
                                         key={tab.id}
                                         onClick={() => handleTabChange(tab.id)}
                                         className={`px-4 py-3 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border-b-2 -mb-px ${activeTab === tab.id
-                                            ? 'text-brand-400 border-brand-400'
+                                            ? 'text-[#e05050] border-[#e05050]'
                                             : 'text-slate-500 border-transparent hover:text-slate-300'
                                             }`}
                                     >
@@ -291,7 +291,7 @@ export default function Clientes() {
                                     <div>
                                         {loadingVendas ? (
                                             <div className="flex items-center justify-center py-16">
-                                                <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                                                <div className="w-6 h-6 border-2 border-[#C01717] border-t-transparent rounded-full animate-spin" />
                                             </div>
                                         ) : clienteVendas.length === 0 ? (
                                             <div className="text-center py-16 text-slate-500 text-sm">Nenhuma compra registrada.</div>
@@ -309,7 +309,7 @@ export default function Clientes() {
                                                                 <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
                                                                 <YAxis tickFormatter={v => `R$${v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v}`} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} width={60} />
                                                                 <Tooltip content={<ChartTooltipContent />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                                                                <Bar dataKey="total" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                                                                <Bar dataKey="total" fill="#C01717" radius={[4, 4, 0, 0]} />
                                                             </BarChart>
                                                         </ResponsiveContainer>
                                                     </div>
@@ -323,7 +323,7 @@ export default function Clientes() {
                                     <div>
                                         {loadingItens ? (
                                             <div className="flex items-center justify-center py-16">
-                                                <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                                                <div className="w-6 h-6 border-2 border-[#C01717] border-t-transparent rounded-full animate-spin" />
                                             </div>
                                         ) : !itensData ? (
                                             <div className="text-center py-16 text-slate-500 text-sm">Sem dados.</div>
@@ -343,16 +343,16 @@ export default function Clientes() {
                                                         <p className="text-[10px] text-slate-500 uppercase tracking-wider">Total catálogo</p>
                                                         <p className="text-xl font-bold text-white">{itensData.totalItens}</p>
                                                     </div>
-                                                    <div className="bg-brand-500/10 border border-brand-500/20 rounded-lg px-3 py-2 text-center">
+                                                    <div className="bg-[#C01717]/10 border border-[#C01717]/20 rounded-lg px-3 py-2 text-center">
                                                         <p className="text-[10px] text-slate-500 uppercase tracking-wider">Cobertura</p>
-                                                        <p className="text-xl font-bold text-brand-400">{itensData.totalItens > 0 ? Math.round(itensData.totalComprados / itensData.totalItens * 100) : 0}%</p>
+                                                        <p className="text-xl font-bold text-[#e05050]">{itensData.totalItens > 0 ? Math.round(itensData.totalComprados / itensData.totalItens * 100) : 0}%</p>
                                                     </div>
                                                 </div>
 
                                                 {/* Filters */}
                                                 <div className="flex gap-2 mb-4">
                                                     <div className="relative flex-1 max-w-[200px] group">
-                                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 group-focus-within:text-brand-400 transition-colors" />
+                                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500 group-focus-within:text-[#e05050] transition-colors" />
                                                         <input
                                                             className="input pl-8 text-xs py-1.5"
                                                             placeholder="Buscar PN..."
@@ -390,7 +390,7 @@ export default function Clientes() {
                                                                             {!filtroLinha && (
                                                                                 <div className="flex gap-1 flex-shrink-0">
                                                                                     {item.linhas.map(l => (
-                                                                                        <span key={l} className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-brand-500/15 text-brand-400 border border-brand-500/20">
+                                                                                        <span key={l} className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-[#C01717]/15 text-[#e05050] border border-[#C01717]/20">
                                                                                             {l === 'Metal Leve' ? 'ML' : l}
                                                                                         </span>
                                                                                     ))}

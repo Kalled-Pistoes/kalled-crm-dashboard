@@ -51,7 +51,7 @@ export default function Visitas() {
 
     if (loading) return (
         <div className="flex items-center justify-center h-64">
-            <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-[#C01717] border-t-transparent rounded-full animate-spin" />
         </div>
     );
 
@@ -74,9 +74,9 @@ export default function Visitas() {
                         <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Custo Filtrado</p>
                         <p className="text-base sm:text-lg font-bold text-amber-400">{formatCurrency(custoTotal)}</p>
                     </div>
-                    <div className="card-premium py-2 sm:py-3 px-4 sm:px-5 border-brand-500/20 shadow-brand-500/5">
+                    <div className="card-premium py-2 sm:py-3 px-4 sm:px-5 border-[#C01717]/20 shadow-none">
                         <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Visitas</p>
-                        <p className="text-base sm:text-lg font-bold text-brand-400">{filtered.length.toLocaleString('pt-BR')}</p>
+                        <p className="text-base sm:text-lg font-bold text-[#e05050]">{filtered.length.toLocaleString('pt-BR')}</p>
                     </div>
                 </div>
             </div>
@@ -84,7 +84,7 @@ export default function Visitas() {
             {/* Filtros */}
             <div className="flex flex-wrap gap-3">
                 <div className="relative flex-1 min-w-[160px] max-w-sm group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-brand-400 transition-colors" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-[#e05050] transition-colors" />
                     <input
                         className="input pl-9"
                         placeholder="Buscar cliente ou representante..."
@@ -97,16 +97,16 @@ export default function Visitas() {
                     value={filtroRep}
                     onChange={e => setFiltroRep(e.target.value)}
                 >
-                    <option value="" className="bg-slate-900">Todos os representantes</option>
-                    {representantes.map(r => <option key={r} value={r} className="bg-slate-900">{r}</option>)}
+                    <option value="" className="bg-[#111113]">Todos os representantes</option>
+                    {representantes.map(r => <option key={r} value={r} className="bg-[#111113]">{r}</option>)}
                 </select>
                 <select
                     className="input max-w-[180px] cursor-pointer"
                     value={filtroTipo}
                     onChange={e => setFiltroTipo(e.target.value)}
                 >
-                    <option value="" className="bg-slate-900">Todos os tipos</option>
-                    {tipos.map(t => <option key={t} value={t} className="bg-slate-900">{t}</option>)}
+                    <option value="" className="bg-[#111113]">Todos os tipos</option>
+                    {tipos.map(t => <option key={t} value={t} className="bg-[#111113]">{t}</option>)}
                 </select>
             </div>
 
@@ -128,12 +128,12 @@ export default function Visitas() {
                                 <tr key={i} className="hover:bg-white/5 transition-colors group">
                                     <td className="px-6 py-4 text-slate-400 whitespace-nowrap">{formatDate(v.data)}</td>
                                     <td className="px-4 py-4">
-                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border bg-brand-500/10 text-brand-400 border-brand-500/20">{v.tipoVisita || '—'}</span>
+                                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border bg-[#C01717]/10 text-[#e05050] border-[#C01717]/20">{v.tipoVisita || '—'}</span>
                                     </td>
-                                    <td className="px-4 py-4 text-white font-medium group-hover:text-brand-300 transition-colors">{v.representante || '—'}</td>
+                                    <td className="px-4 py-4 text-white font-medium group-hover:text-[#f87171] transition-colors">{v.representante || '—'}</td>
                                     <td className="px-4 py-4 max-w-[200px]">
                                         {v.cliente
-                                            ? <button onClick={() => navigate(`/clientes?cliente=${encodeURIComponent(v.cliente)}`)} className="text-slate-400 hover:text-brand-400 transition-colors text-left truncate w-full font-medium cursor-pointer underline-offset-2 hover:underline">{v.cliente}</button>
+                                            ? <button onClick={() => navigate(`/clientes?cliente=${encodeURIComponent(v.cliente)}`)} className="text-slate-400 hover:text-[#e05050] transition-colors text-left truncate w-full font-medium cursor-pointer underline-offset-2 hover:underline">{v.cliente}</button>
                                             : <span className="text-slate-600">—</span>}
                                     </td>
                                     <td className="px-6 py-4 text-right text-amber-400 font-bold whitespace-nowrap">

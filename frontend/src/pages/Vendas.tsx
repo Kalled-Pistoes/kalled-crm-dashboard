@@ -40,7 +40,7 @@ export default function Vendas() {
 
     if (loading) return (
         <div className="flex items-center justify-center h-64">
-            <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-[#C01717] border-t-transparent rounded-full animate-spin" />
         </div>
     );
 
@@ -63,9 +63,9 @@ export default function Vendas() {
                         <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Filtrado</p>
                         <p className="text-base sm:text-lg font-bold text-emerald-400">{formatCurrency(totalFiltrado)}</p>
                     </div>
-                    <div className="card-premium py-2 sm:py-3 px-4 sm:px-5 border-brand-500/20 shadow-brand-500/5">
+                    <div className="card-premium py-2 sm:py-3 px-4 sm:px-5 border-[#C01717]/20 shadow-none">
                         <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Registros</p>
-                        <p className="text-base sm:text-lg font-bold text-brand-400">{filtered.length.toLocaleString('pt-BR')}</p>
+                        <p className="text-base sm:text-lg font-bold text-[#e05050]">{filtered.length.toLocaleString('pt-BR')}</p>
                     </div>
                 </div>
             </div>
@@ -73,7 +73,7 @@ export default function Vendas() {
             {/* Filtros */}
             <div className="flex flex-wrap gap-3">
                 <div className="relative flex-1 min-w-[160px] max-w-sm group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-brand-400 transition-colors" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-[#e05050] transition-colors" />
                     <input
                         className="input pl-9"
                         placeholder="Buscar cliente ou código..."
@@ -126,7 +126,7 @@ export default function Vendas() {
                             {filtered.slice(0, 500).map((v, i) => (
                                 <tr key={i} className="hover:bg-white/5 transition-colors group">
                                     <td className="px-6 py-4 text-slate-400 whitespace-nowrap">{formatDate(v.data)}</td>
-                                    <td className="px-4 py-4 text-white font-medium max-w-[220px] truncate group-hover:text-brand-300 transition-colors">{v.cliente}</td>
+                                    <td className="px-4 py-4 text-white font-medium max-w-[220px] truncate group-hover:text-[#f87171] transition-colors">{v.cliente}</td>
                                     <td className="px-4 py-4 text-slate-500 font-mono text-xs tracking-tighter">{v.codigo}</td>
                                     <td className="px-4 py-4 text-right text-slate-400">{v.quantidade}</td>
                                     <td className="px-6 py-4 text-right text-emerald-400 font-bold whitespace-nowrap">{formatCurrency(v.valor)}</td>

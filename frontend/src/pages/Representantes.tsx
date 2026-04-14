@@ -17,7 +17,7 @@ const MESES_FULL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
 function ChartTooltip({ active, payload, label }: any) {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-slate-900 border border-white/10 rounded-lg px-3 py-2 shadow-xl">
+        <div className="bg-[#111113] border border-white/10 rounded-lg px-3 py-2 shadow-xl">
             <p className="text-xs text-slate-400 mb-1">{label}</p>
             {payload.map((p: any) => (
                 <p key={p.dataKey} className="text-sm font-bold" style={{ color: p.color }}>
@@ -32,9 +32,9 @@ function ComparativoTooltip({ active, payload, label }: any) {
     if (!active || !payload?.length) return null;
     const d = payload[0]?.payload as ComparativoAnoData;
     return (
-        <div className="bg-slate-900 border border-white/10 rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
+        <div className="bg-[#111113] border border-white/10 rounded-lg px-3 py-2 shadow-xl min-w-[160px]">
             <p className="text-xs font-bold text-white mb-1">{label}</p>
-            <p className="text-sm font-bold text-brand-400">{formatCurrency(d.total)}</p>
+            <p className="text-sm font-bold text-[#e05050]">{formatCurrency(d.total)}</p>
             {d.percentMeta !== null && (
                 <p className={`text-xs font-bold mt-0.5 ${d.percentMeta >= 100 ? 'text-emerald-400' : 'text-rose-400'}`}>
                     {d.percentMeta >= 100 ? '+' : ''}{(d.percentMeta - 100).toFixed(1)}% da meta
@@ -127,7 +127,7 @@ export default function Representantes() {
 
     if (loading) return (
         <div className="flex items-center justify-center h-64">
-            <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-8 h-8 border-2 border-[#C01717] border-t-transparent rounded-full animate-spin" />
         </div>
     );
 
@@ -140,23 +140,23 @@ export default function Representantes() {
                     <select
                         value={selectedRep}
                         onChange={e => setSelectedRep(e.target.value)}
-                        className="appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 pr-10 text-sm font-bold text-white focus:outline-none focus:border-brand-500/50 cursor-pointer max-w-[400px] truncate"
+                        className="appearance-none bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 pr-10 text-sm font-bold text-white focus:outline-none focus:border-[#C01717]/50 cursor-pointer max-w-[400px] truncate"
                     >
                         {representantes.map(r => (
-                            <option key={r.nome} value={r.nome} className="bg-slate-900">{r.nome}</option>
+                            <option key={r.nome} value={r.nome} className="bg-[#111113]">{r.nome}</option>
                         ))}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
                 {nomeMes && (
-                    <div className="flex items-center gap-2 bg-brand-500/10 border border-brand-500/20 rounded-xl px-3 py-2">
-                        <Calendar className="w-3.5 h-3.5 text-brand-400" />
-                        <span className="text-sm font-bold text-brand-300">{nomeMes} — Comparativo Anual</span>
+                    <div className="flex items-center gap-2 bg-[#C01717]/10 border border-[#C01717]/20 rounded-xl px-3 py-2">
+                        <Calendar className="w-3.5 h-3.5 text-[#e05050]" />
+                        <span className="text-sm font-bold text-[#f87171]">{nomeMes} — Comparativo Anual</span>
                     </div>
                 )}
             </div>
             <div className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5">
-                <Users className="w-4 h-4 text-brand-400" />
+                <Users className="w-4 h-4 text-[#e05050]" />
                 <span className="text-sm font-bold text-slate-400">N° de Clientes:</span>
                 <span className="text-sm font-black text-white">{clientes.length}</span>
             </div>
@@ -173,7 +173,7 @@ export default function Representantes() {
 
                 {loadingComparativo ? (
                     <div className="flex items-center justify-center h-64">
-                        <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                        <div className="w-8 h-8 border-2 border-[#C01717] border-t-transparent rounded-full animate-spin" />
                     </div>
                 ) : comparativoData.length === 0 ? (
                     <div className="card-premium text-center py-16">
@@ -184,9 +184,9 @@ export default function Representantes() {
                         {/* Gráfico comparativo */}
                         <div className="card-premium">
                             <div className="flex items-center gap-2 mb-6">
-                                <TrendingUp className="w-4 h-4 text-brand-400" />
+                                <TrendingUp className="w-4 h-4 text-[#e05050]" />
                                 <h2 className="text-sm font-semibold text-white">
-                                    Vendas em <span className="text-brand-300">{nomeMes}</span> por Ano
+                                    Vendas em <span className="text-[#f87171]">{nomeMes}</span> por Ano
                                 </h2>
                                 {metaComparativo > 0 && (
                                     <span className="ml-auto text-xs font-bold text-slate-500">
@@ -198,7 +198,7 @@ export default function Representantes() {
                                 <BarChart
                                     data={comparativoData.map(d => ({
                                         ...d,
-                                        fill: d.percentMeta === null ? '#334155' : d.percentMeta >= 100 ? '#10b981' : '#6366f1',
+                                        fill: d.percentMeta === null ? '#334155' : d.percentMeta >= 100 ? '#10b981' : '#C01717',
                                     }))}
                                     margin={{ left: 0, right: 16, top: 28 }}
                                     barCategoryGap="40%"
@@ -217,10 +217,10 @@ export default function Representantes() {
                                     {metaComparativo > 0 && (
                                         <ReferenceLine
                                             y={metaComparativo}
-                                            stroke="#ec4899"
+                                            stroke="#f97316"
                                             strokeDasharray="5 4"
                                             strokeWidth={1.5}
-                                            label={{ value: `Meta: ${formatCurrency(metaComparativo)}`, fill: '#ec4899', fontSize: 10, position: 'insideTopRight' }}
+                                            label={{ value: `Meta: ${formatCurrency(metaComparativo)}`, fill: '#f97316', fontSize: 10, position: 'insideTopRight' }}
                                         />
                                     )}
                                     <Bar dataKey="total" fill="fill" radius={[6, 6, 0, 0]} maxBarSize={80}>
@@ -238,7 +238,7 @@ export default function Representantes() {
                                     <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Acima da meta
                                 </div>
                                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-brand-500" /> Abaixo da meta
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#C01717]" /> Abaixo da meta
                                 </div>
                                 {metaComparativo > 0 && (
                                     <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -254,7 +254,7 @@ export default function Representantes() {
                                 const acimaMeta = d.percentMeta !== null && d.percentMeta >= 100;
                                 const diff = d.percentMeta !== null ? d.percentMeta - 100 : null;
                                 return (
-                                    <div key={d.ano} className={`card-premium flex flex-col gap-3 border-t-2 ${acimaMeta ? 'border-t-emerald-500/60' : 'border-t-brand-500/40'}`}>
+                                    <div key={d.ano} className={`card-premium flex flex-col gap-3 border-t-2 ${acimaMeta ? 'border-t-emerald-500/60' : 'border-t-[#C01717]/40'}`}>
                                         {/* Ano + mês */}
                                         <div className="flex items-center justify-between">
                                             <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{nomeMes}</p>
@@ -276,7 +276,7 @@ export default function Representantes() {
                                                 <div className="flex items-center gap-2">
                                                     <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
                                                         <div
-                                                            className={`h-full rounded-full ${acimaMeta ? 'bg-emerald-500' : 'bg-brand-500'}`}
+                                                            className={`h-full rounded-full ${acimaMeta ? 'bg-emerald-500' : 'bg-[#C01717]'}`}
                                                             style={{ width: `${Math.min(d.percentMeta ?? 0, 100)}%` }}
                                                         />
                                                     </div>
@@ -296,7 +296,7 @@ export default function Representantes() {
                                                 {d.clientes.map(c => (
                                                     <li key={c.nome} title={c.nome} className="flex items-center justify-between gap-2 bg-white/5 rounded px-2 py-1.5 hover:bg-white/10 transition-colors">
                                                         <span className="text-xs text-slate-300 truncate min-w-0">{c.nome}</span>
-                                                        <span className="text-xs font-bold text-brand-400 whitespace-nowrap flex-shrink-0">{formatCurrency(c.total)}</span>
+                                                        <span className="text-xs font-bold text-[#e05050] whitespace-nowrap flex-shrink-0">{formatCurrency(c.total)}</span>
                                                     </li>
                                                 ))}
                                                 {d.clientes.length === 0 && (
@@ -321,7 +321,7 @@ export default function Representantes() {
 
             {loadingDetail ? (
                 <div className="flex items-center justify-center h-64">
-                    <div className="w-8 h-8 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                    <div className="w-8 h-8 border-2 border-[#C01717] border-t-transparent rounded-full animate-spin" />
                 </div>
             ) : (
                 <>
@@ -329,7 +329,7 @@ export default function Representantes() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="card-premium">
                             <div className="flex items-center gap-2 mb-4">
-                                <TrendingUp className="w-4 h-4 text-brand-400" />
+                                <TrendingUp className="w-4 h-4 text-[#e05050]" />
                                 <h2 className="text-sm font-semibold text-white">Vendas</h2>
                             </div>
                             <div className="overflow-x-auto">
@@ -340,15 +340,15 @@ export default function Representantes() {
                                             <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 600 }} axisLine={false} tickLine={false} />
                                             <YAxis tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} width={44} />
                                             <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                                            <Bar dataKey="pedido" name="Pedido" fill="#6366f1" radius={[3, 3, 0, 0]} />
-                                            <Bar dataKey="visita" name="Visita Técnica" fill="#ec4899" radius={[3, 3, 0, 0]} />
+                                            <Bar dataKey="pedido" name="Pedido" fill="#C01717" radius={[3, 3, 0, 0]} />
+                                            <Bar dataKey="visita" name="Visita Técnica" fill="#f97316" radius={[3, 3, 0, 0]} />
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
                             </div>
                             <div className="flex gap-6 mt-3 justify-center">
                                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-brand-500" /> Pedido
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#C01717]" /> Pedido
                                 </div>
                                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                                     <div className="w-2.5 h-2.5 rounded-full bg-pink-500" /> Visita Técnica
@@ -358,7 +358,7 @@ export default function Representantes() {
 
                         <div className="card-premium">
                             <div className="flex items-center gap-2 mb-4">
-                                <Target className="w-4 h-4 text-brand-400" />
+                                <Target className="w-4 h-4 text-[#e05050]" />
                                 <h2 className="text-sm font-semibold text-white">Média de Venda Geral</h2>
                             </div>
                             <ResponsiveContainer width="100%" height={220}>
@@ -367,8 +367,8 @@ export default function Representantes() {
                                     <XAxis dataKey="ano" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }} axisLine={false} tickLine={false} />
                                     <YAxis tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} width={44} />
                                     <Tooltip content={<ChartTooltip />} />
-                                    <Line type="monotone" dataKey="meta" name="Linha de Meta" stroke="#ec4899" strokeWidth={2} strokeDasharray="5 4" dot={false} />
-                                    <Line type="monotone" dataKey="media" name="Média de Vendas" stroke="#6366f1" strokeWidth={2} dot={{ fill: '#6366f1', r: 4, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                                    <Line type="monotone" dataKey="meta" name="Linha de Meta" stroke="#f97316" strokeWidth={2} strokeDasharray="5 4" dot={false} />
+                                    <Line type="monotone" dataKey="media" name="Média de Vendas" stroke="#C01717" strokeWidth={2} dot={{ fill: '#C01717', r: 4, strokeWidth: 0 }} activeDot={{ r: 5 }} />
                                 </LineChart>
                             </ResponsiveContainer>
                             <div className="flex gap-6 mt-3 justify-center">
@@ -376,7 +376,7 @@ export default function Representantes() {
                                     <div className="w-4 border-t-2 border-dashed border-pink-500" /> Linha de Meta
                                 </div>
                                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                    <div className="w-2.5 h-2.5 rounded-full bg-brand-500" /> Média de Vendas
+                                    <div className="w-2.5 h-2.5 rounded-full bg-[#C01717]" /> Média de Vendas
                                 </div>
                             </div>
                         </div>
@@ -386,12 +386,12 @@ export default function Representantes() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="card-premium">
                             <div className="flex items-center gap-2 mb-4">
-                                <Users className="w-4 h-4 text-brand-400" />
+                                <Users className="w-4 h-4 text-[#e05050]" />
                                 <h2 className="text-sm font-semibold text-white">Clientes</h2>
                             </div>
                             <div className="overflow-auto max-h-[300px]">
                                 <table className="w-full text-sm">
-                                    <thead className="sticky top-0 bg-[#0f172a] z-10">
+                                    <thead className="sticky top-0 bg-[#18181b] z-10">
                                         <tr>
                                             <th className="text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 pb-3 pr-4">Cliente</th>
                                             <th className="text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 pb-3 pr-4">Ultima Compra</th>
@@ -420,12 +420,12 @@ export default function Representantes() {
 
                         <div className="card-premium">
                             <div className="flex items-center gap-2 mb-4">
-                                <DollarSign className="w-4 h-4 text-brand-400" />
+                                <DollarSign className="w-4 h-4 text-[#e05050]" />
                                 <h2 className="text-sm font-semibold text-white">Custo de Visitas por Cliente</h2>
                             </div>
                             <div className="overflow-auto max-h-[300px]">
                                 <table className="w-full text-sm">
-                                    <thead className="sticky top-0 bg-[#0f172a] z-10">
+                                    <thead className="sticky top-0 bg-[#18181b] z-10">
                                         <tr>
                                             <th className="text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 pb-3 pr-4">Cliente</th>
                                             <th className="text-left text-[10px] font-bold uppercase tracking-wider text-slate-500 pb-3 pr-4">Custo</th>

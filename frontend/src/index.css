@@ -1,38 +1,33 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-50: #eef2ff;
-  --color-brand-100: #e0e7ff;
-  --color-brand-200: #c7d2fe;
-  --color-brand-300: #a5b4fc;
-  --color-brand-400: #818cf8;
-  --color-brand-500: #6366f1;
-  --color-brand-600: #4f46e5;
-  --color-brand-700: #4338ca;
-  --color-brand-800: #3730a3;
-  --color-brand-900: #312e81;
-  --color-brand-950: #1e1b4b;
+  /* Kalled Red Palette */
+  --color-brand-50:  #fef2f2;
+  --color-brand-100: #fee2e2;
+  --color-brand-200: #fecaca;
+  --color-brand-300: #fca5a5;
+  --color-brand-400: #e05050;
+  --color-brand-500: #C01717;
+  --color-brand-600: #a01414;
+  --color-brand-700: #801010;
+  --color-brand-800: #600c0c;
+  --color-brand-900: #450909;
+  --color-brand-950: #2d0606;
 
-  /* Premium Dark Theme Colors */
-  --color-pbi-navy: #020617;
-  /* Deepest blue/black */
-  --color-pbi-bg: #030712;
-  /* Main background */
-  --color-pbi-purple: #8b5cf6;
-  --color-pbi-pink: #ec4899;
-  --color-pbi-green: #10b981;
-  --color-pbi-card: rgba(15, 23, 42, 0.6);
-  /* Slate glass */
-  --color-pbi-text: #f8fafc;
-  --color-pbi-text-muted: #94a3b8;
+  /* Kalled Dark Theme Colors */
+  --color-pbi-navy:  #111113;
+  --color-pbi-bg:    #18181b;
+  --color-pbi-card:  rgba(35, 35, 40, 0.80);
+  --color-pbi-text:  #f0f0f0;
+  --color-pbi-text-muted: #a0a0a8;
 }
 
 @layer base {
   body {
     @apply bg-pbi-bg text-pbi-text font-sans antialiased selection:bg-brand-500/30;
     background-image:
-      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
-      radial-gradient(at 100% 0%, rgba(236, 72, 153, 0.1) 0px, transparent 50%);
+      radial-gradient(at 0% 0%,   rgba(192, 23, 23, 0.10) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(192, 23, 23, 0.05) 0px, transparent 50%);
     background-attachment: fixed;
   }
 
@@ -56,11 +51,11 @@
   }
 
   .btn-primary {
-    @apply bg-brand-600 hover:bg-brand-500 text-white font-semibold px-4 py-2 rounded-xl transition-all shadow-lg active:scale-95;
+    @apply bg-brand-500 hover:bg-brand-400 text-white font-semibold px-4 py-2 rounded-xl transition-all shadow-lg active:scale-95;
   }
 
   .btn-ghost {
-    @apply text-slate-400 hover:text-white hover:bg-white/5 px-3 py-2 rounded-xl transition-all;
+    @apply text-[#a0a0a8] hover:text-white hover:bg-white/5 px-3 py-2 rounded-xl transition-all;
   }
 
   .table-row-hover {
@@ -68,7 +63,7 @@
   }
 
   .glass-header {
-    @apply bg-pbi-navy/60 backdrop-blur-md border-b border-white/5;
+    @apply bg-pbi-navy/80 backdrop-blur-md border-b border-white/5;
   }
 
   .badge {
@@ -76,7 +71,7 @@
   }
 
   .input {
-    @apply bg-slate-900/50 border border-white/10 text-slate-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent placeholder-slate-500 w-full backdrop-blur-sm;
+    @apply bg-[#111113]/60 border border-white/10 text-[#f0f0f0] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent placeholder-[#555] w-full backdrop-blur-sm;
   }
 }
 
@@ -87,13 +82,14 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-900;
+  background: #111113;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-700 rounded-full;
+  background: #333;
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-600;
+  background: #444;
 }

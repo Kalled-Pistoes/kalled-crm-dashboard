@@ -30,15 +30,15 @@ export default function Login() {
     return (
         <div className="min-h-screen bg-pbi-bg flex items-center justify-center relative overflow-hidden">
             {/* Background effects */}
-            <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-brand-500/10 blur-[120px] rounded-full pointer-events-none" />
+            <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-[#C01717]/10 blur-[120px] rounded-full pointer-events-none" />
             <div className="absolute top-[20%] -right-[5%] w-[30%] h-[30%] bg-pink-500/5 blur-[100px] rounded-full pointer-events-none" />
 
             <div className="relative z-10 w-full max-w-sm mx-4">
                 {/* Logo */}
                 <div className="text-center mb-8">
                     <div className="inline-flex items-center gap-3 mb-3">
-                        <div className="w-10 h-10 rounded-xl bg-sky-500/20 flex items-center justify-center">
-                            <TrendingUp className="w-6 h-6 text-sky-400" />
+                        <div className="w-10 h-10 rounded-xl bg-[#C01717]/15 flex items-center justify-center">
+                            <TrendingUp className="w-6 h-6 text-[#e05050]" />
                         </div>
                         <div className="text-left">
                             <p className="text-[10px] font-bold opacity-60 uppercase tracking-widest text-slate-400">POWER BI</p>
@@ -68,7 +68,7 @@ export default function Login() {
                                     autoComplete="username"
                                     autoFocus
                                     required
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500/50 transition-all"
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:ring-1 focus:ring-[#C01717] focus:border-[#C01717]/50 transition-all"
                                 />
                             </div>
                         </div>
@@ -87,7 +87,7 @@ export default function Login() {
                                     placeholder="••••••••"
                                     autoComplete="current-password"
                                     required
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500/50 transition-all"
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:ring-1 focus:ring-[#C01717] focus:border-[#C01717]/50 transition-all"
                                 />
                                 <button
                                     type="button"
@@ -110,7 +110,7 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full bg-sky-500 hover:bg-sky-400 disabled:bg-sky-500/50 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors mt-2"
+                            className="w-full bg-[#C01717] hover:bg-[#a01414] disabled:bg-[#C01717]/50 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors mt-2"
                         >
                             {loading ? 'Entrando...' : 'Entrar'}
                         </button>

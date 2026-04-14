@@ -7,7 +7,7 @@ interface TopClientesProps {
 export default function TopClientes({ clientes }: TopClientesProps) {
     return (
         <div className="card-premium overflow-hidden flex flex-col h-full">
-            <div className="bg-brand-600/20 text-brand-300 px-4 py-3 border-b border-white/5">
+            <div className="bg-[#C01717]/15 text-[#e05050] px-4 py-3 border-b border-[#2a2a2a]">
                 <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-center">Top 5 Clientes (Faturamento)</h3>
             </div>
 
@@ -31,11 +31,11 @@ export default function TopClientes({ clientes }: TopClientesProps) {
                                     </div>
                                 </td>
                                 <td className="py-3 px-2 text-center">
-                                    <span className="px-2 py-0.5 bg-brand-500/10 text-brand-400 border border-brand-500/20 rounded text-[10px] font-bold">
+                                    <span className="px-2 py-0.5 bg-[#C01717]/10 text-[#e05050] border border-[#C01717]/20 rounded text-[10px] font-bold">
                                         {c.estado}
                                     </span>
                                 </td>
-                                <td className="py-3 px-4 w-28 text-right font-bold text-brand-400 pr-4">{formatCurrency(c.valorTotal)}</td>
+                                <td className="py-3 px-4 w-28 text-right font-bold text-[#e05050] pr-4">{formatCurrency(c.valorTotal)}</td>
                             </tr>
                         ))}
                     </tbody>

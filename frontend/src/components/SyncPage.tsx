@@ -20,19 +20,19 @@ function FileInput({ label, hint, file, onSelect }: { label: string; hint: strin
         <div
             onClick={() => ref.current?.click()}
             className={`relative border-2 border-dashed rounded-xl p-5 cursor-pointer transition-all
-                ${file ? 'border-sky-500/60 bg-sky-500/5' : 'border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5'}`}
+                ${file ? 'border-[#C01717]/60 bg-[#C01717]/5' : 'border-white/10 bg-white/3 hover:border-white/20 hover:bg-white/5'}`}
         >
             <input ref={ref} type="file" accept=".xlsx,.xls" className="hidden"
                 onChange={e => { if (e.target.files?.[0]) onSelect(e.target.files[0]); }} />
             <div className="flex items-center gap-3">
-                <FileSpreadsheet className={`w-8 h-8 flex-shrink-0 ${file ? 'text-sky-400' : 'text-slate-500'}`} />
+                <FileSpreadsheet className={`w-8 h-8 flex-shrink-0 ${file ? 'text-[#e05050]' : 'text-slate-500'}`} />
                 <div className="min-w-0">
                     <p className="text-sm font-semibold text-white">{label}</p>
                     <p className="text-xs text-slate-400 truncate">{file ? file.name : hint}</p>
-                    {file && <p className="text-[10px] text-sky-400 mt-0.5">{(file.size / 1024 / 1024).toFixed(2)} MB • clique para trocar</p>}
+                    {file && <p className="text-[10px] text-[#e05050] mt-0.5">{(file.size / 1024 / 1024).toFixed(2)} MB • clique para trocar</p>}
                 </div>
                 {!file && <Upload className="w-4 h-4 text-slate-500 ml-auto flex-shrink-0" />}
-                {file && <CheckCircle className="w-4 h-4 text-sky-400 ml-auto flex-shrink-0" />}
+                {file && <CheckCircle className="w-4 h-4 text-[#e05050] ml-auto flex-shrink-0" />}
             </div>
         </div>
     );
@@ -52,7 +52,7 @@ function PreviewTable({ sheet, rows }: { sheet: string; rows: any[] }) {
     const cols = Object.keys(rows[0]).slice(0, 6);
     return (
         <div className="mb-4">
-            <p className="text-xs font-semibold text-sky-400 mb-1">{sheet}</p>
+            <p className="text-xs font-semibold text-[#e05050] mb-1">{sheet}</p>
             <div className="overflow-x-auto rounded-lg border border-white/5">
                 <table className="w-full text-[10px]">
                     <thead>
@@ -132,8 +132,8 @@ export default function SyncPage() {
         <div className="max-w-3xl mx-auto py-4">
             {/* Header */}
             <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center">
-                    <Database className="w-5 h-5 text-sky-400" />
+                <div className="w-10 h-10 rounded-xl bg-[#C01717]/10 border border-[#C01717]/20 flex items-center justify-center">
+                    <Database className="w-5 h-5 text-[#e05050]" />
                 </div>
                 <div>
                     <h1 className="text-lg font-bold text-white">Atualizar Base de Dados</h1>
@@ -161,7 +161,7 @@ export default function SyncPage() {
                     onClick={handleSync}
                     disabled={loading || previewing || (!vendasFile && !catalogoFile)}
                     className="flex-1 py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2
-                        bg-sky-500 hover:bg-sky-400 disabled:bg-white/5 disabled:text-slate-500 disabled:cursor-not-allowed text-white"
+                        bg-[#C01717] hover:bg-[#a01414] disabled:bg-white/5 disabled:text-slate-500 disabled:cursor-not-allowed text-white"
                 >
                     {loading ? <><RefreshCw className="w-4 h-4 animate-spin" /> Sincronizando...</> : <><Upload className="w-4 h-4" /> Sincronizar Agora</>}
                 </button>

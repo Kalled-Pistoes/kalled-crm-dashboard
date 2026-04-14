@@ -18,7 +18,7 @@ export default function RankingTable({ vendedores }: RankingTableProps) {
 
     return (
         <div className="card-premium overflow-hidden flex flex-col h-full">
-            <div className="bg-brand-600/20 text-brand-300 px-4 py-3 border-b border-white/5">
+            <div className="bg-[#C01717]/15 text-[#e05050] px-4 py-3 border-b border-[#2a2a2a]">
                 <h3 className="text-[10px] font-bold uppercase tracking-[0.2em] text-center">Ranking Geral de Vendedores</h3>
             </div>
 

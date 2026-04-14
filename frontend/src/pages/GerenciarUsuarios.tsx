@@ -132,8 +132,8 @@ export default function GerenciarUsuarios() {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-xl bg-sky-500/15 flex items-center justify-center">
-                        <UserCog className="w-5 h-5 text-sky-400" />
+                    <div className="w-9 h-9 rounded-xl bg-[#C01717]/15 flex items-center justify-center">
+                        <UserCog className="w-5 h-5 text-[#e05050]" />
                     </div>
                     <div>
                         <h1 className="text-base font-semibold text-white">Gerenciar Usuários</h1>
@@ -142,7 +142,7 @@ export default function GerenciarUsuarios() {
                 </div>
                 <button
                     onClick={openCreate}
-                    className="flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+                    className="flex items-center gap-2 bg-[#C01717] hover:bg-[#a01414] text-white text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
                 >
                     <Plus className="w-3.5 h-3.5" /> Novo Usuário
                 </button>
@@ -172,7 +172,7 @@ export default function GerenciarUsuarios() {
                                     {u.role === 'admin' ? 'Administrador' : `Representante${u.representante ? `: ${u.representante}` : ' (sem vínculo)'}`}
                                 </p>
                             </div>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${u.role === 'admin' ? 'text-amber-400 border-amber-500/30 bg-amber-500/10' : 'text-sky-400 border-sky-500/30 bg-sky-500/10'}`}>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${u.role === 'admin' ? 'text-amber-400 border-amber-500/30 bg-amber-500/10' : 'text-[#e05050] border-[#C01717]/30 bg-[#C01717]/10'}`}>
                                 {u.role === 'admin' ? 'ADMIN' : 'REP'}
                             </span>
                             <div className="flex items-center gap-1">
@@ -240,7 +240,7 @@ export default function GerenciarUsuarios() {
                                         value={form.username}
                                         onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
                                         placeholder="nome de login"
-                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:ring-1 focus:ring-sky-500"
+                                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:ring-1 focus:ring-[#C01717]"
                                     />
                                 </div>
                             )}
@@ -256,7 +256,7 @@ export default function GerenciarUsuarios() {
                                     value={form.password}
                                     onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                                     placeholder={editingId ? '••••••••' : 'senha de acesso'}
-                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:ring-1 focus:ring-sky-500"
+                                    className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-slate-600 outline-none focus:ring-1 focus:ring-[#C01717]"
                                 />
                             </div>
 
@@ -266,7 +266,7 @@ export default function GerenciarUsuarios() {
                                 <select
                                     value={form.role}
                                     onChange={e => setForm(f => ({ ...f, role: e.target.value, representante: e.target.value === 'admin' ? '' : f.representante }))}
-                                    className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-sky-500"
+                                    className="w-full bg-[#111113] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-[#C01717]"
                                 >
                                     <option value="representante">Representante</option>
                                     <option value="admin">Administrador</option>
@@ -280,7 +280,7 @@ export default function GerenciarUsuarios() {
                                     <select
                                         value={form.representante}
                                         onChange={e => setForm(f => ({ ...f, representante: e.target.value }))}
-                                        className="w-full bg-slate-900 border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-sky-500"
+                                        className="w-full bg-[#111113] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:ring-1 focus:ring-[#C01717]"
                                     >
                                         <option value="">— Selecione —</option>
                                         {reps.map(r => (
@@ -306,7 +306,7 @@ export default function GerenciarUsuarios() {
                                 <button
                                     onClick={handleSave}
                                     disabled={saving}
-                                    className="flex-1 bg-sky-500 hover:bg-sky-400 disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
+                                    className="flex-1 bg-[#C01717] hover:bg-[#a01414] disabled:opacity-50 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors"
                                 >
                                     {saving ? 'Salvando...' : 'Salvar'}
                                 </button>
