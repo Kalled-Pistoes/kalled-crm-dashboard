@@ -119,7 +119,7 @@ export default function Catalogo() {
             <header className={`border-b ${t.header(dark)} px-4 sm:px-8 py-3 flex items-center justify-between sticky top-0 z-20`}>
                 <div className="flex items-center gap-4">
                     <img
-                        src="/logo-kalled.png"
+                        src={dark ? '/logo-kalled-dark.png' : '/logo-kalled.png'}
                         alt="Kalled Pistões"
                         className="h-10 sm:h-12 object-contain"
                         onError={e => {
