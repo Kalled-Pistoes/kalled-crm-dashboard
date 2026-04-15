@@ -388,6 +388,18 @@ export default function Catalogo() {
                                                 <p className="text-base font-semibold">{p.sobremedida}</p>
                                             </div>
                                         )}
+                                        {p.diametro_cilindro && (
+                                            <div>
+                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Diâmetro</p>
+                                                <p className="text-base font-semibold font-mono">{Number(p.diametro_cilindro).toFixed(2)} mm</p>
+                                            </div>
+                                        )}
+                                        {p.qtd_pistoes && (
+                                            <div>
+                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Pistões</p>
+                                                <p className="text-base font-semibold">{p.qtd_pistoes} un</p>
+                                            </div>
+                                        )}
                                         {p.motor && (
                                             <div className="col-span-2">
                                                 <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Motor</p>
