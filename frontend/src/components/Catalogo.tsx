@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, Lock, Package, AlertCircle, Sun, Moon, Sparkles } from 'lucide-react';
+import { Search, X, Lock, Package, AlertCircle, Sun, Moon, Sparkles, User, Mail, Phone, MapPin } from 'lucide-react';
 import { supabase, catalogoConfigured, type CatalogoProduto } from '../lib/supabase';
 
 interface Filters {
@@ -51,6 +51,10 @@ const t = {
     toggleBg:   (d: boolean) => d ? 'bg-[#2a2a30] hover:bg-[#333] text-[#d0d0d8]' : 'bg-[#e8e8e8] hover:bg-[#ddd] text-[#555]',
 };
 
+const ESTADOS = [
+    'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
+];
+
 export default function Catalogo() {
     const navigate = useNavigate();
     const { dark, toggle } = useTheme();
@@ -63,6 +67,16 @@ export default function Catalogo() {
     const [grupos, setGrupos] = useState<string[]>([]);
     const [optionsLoaded, setOptionsLoaded] = useState(false);
     const [error, setError] = useState('');
+
+    const [visitorModal, setVisitorModal] = useState(false);
+    const [visitorData, setVisitorData] = useState({ nome: '', email: '', telefone: '', estado: '' });
+    const [savingVisitor, setSavingVisitor] = useState(false);
+
+    useEffect(() => {
+        if (!localStorage.getItem('kalled_visitante_id')) {
+            setVisitorModal(true);
+        }
+    }, []);
 
     useEffect(() => {
         if (!catalogoConfigured) return;
@@ -115,12 +129,122 @@ export default function Catalogo() {
     function handleClear() { setFilters(EMPTY); setResults([]); setSearched(false); setError(''); }
     const set = (k: keyof Filters, v: string) => setFilters((p: Filters) => ({ ...p, [k]: v }));
 
+    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.length > 11) v = v.slice(0, 11);
+        if (v.length > 2) v = `(${v.slice(0, 2)}) ${v.slice(2)}`;
+        if (v.length > 10) v = `${v.slice(0, 10)}-${v.slice(10)}`;
+        setVisitorData(p => ({ ...p, telefone: v }));
+    };
+
+    async function handleVisitorSubmit(e: FormEvent) {
+        e.preventDefault();
+        setSavingVisitor(true);
+        try {
+            const { data, error: err } = await supabase.from('visitantes_catalogo').insert([{
+                ...visitorData,
+                telefone: visitorData.telefone.replace(/\D/g, '')
+            }]).select().single();
+            
+            if (err) {
+                // If unique constraint violation on phone, we just log them in
+                if (err.code === '23505') {
+                    const { data: existing } = await supabase.from('visitantes_catalogo')
+                        .select('id')
+                        .eq('telefone', visitorData.telefone.replace(/\D/g, ''))
+                        .single();
+                        
+                    if (existing) {
+                        localStorage.setItem('kalled_visitante_id', existing.id);
+                        setVisitorModal(false);
+                        return;
+                    }
+                }
+                throw err;
+            }
+            localStorage.setItem('kalled_visitante_id', data.id);
+            setVisitorModal(false);
+        } catch (err: any) {
+            alert('Erro ao salvar identificação: ' + err.message);
+        } finally {
+            setSavingVisitor(false);
+        }
+    }
+
     // Shared input/select class
     const inputCls = `w-full rounded-lg px-4 py-3 text-base outline-none transition-all ${t.input(dark)}`;
     const selectBg = dark ? '#18181b' : '#ffffff';
 
     return (
         <div className={`min-h-screen flex flex-col ${t.page(dark)}`} style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+            {visitorModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className={`${t.card(dark)} w-full max-w-md p-8 shadow-2xl relative overflow-hidden`}>
+                        <div className="absolute top-0 left-0 w-full h-1 bg-[#C01717]" />
+                        
+                        <div className="text-center mb-8">
+                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#C01717]/10 mb-4">
+                                <span className="text-4xl font-black text-[#C01717] italic">K</span>
+                            </div>
+                            <h2 className="text-2xl font-black mb-2">Bem-vindo ao Catálogo</h2>
+                            <p className={`text-sm ${t.muted(dark)}`}>Por favor, identifique-se para continuar.</p>
+                        </div>
+
+                        <form onSubmit={handleVisitorSubmit} className="space-y-4">
+                            <div>
+                                <label className={`block mb-1.5 ${t.label(dark)}`}>Nome Completo</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <User className={`w-5 h-5 ${t.muted(dark)}`} />
+                                    </div>
+                                    <input required type="text" value={visitorData.nome} onChange={e => setVisitorData(p => ({ ...p, nome: e.target.value }))}
+                                        placeholder="Seu nome" className={`${inputCls} pl-10`} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className={`block mb-1.5 ${t.label(dark)}`}>E-mail</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Mail className={`w-5 h-5 ${t.muted(dark)}`} />
+                                    </div>
+                                    <input required type="email" value={visitorData.email} onChange={e => setVisitorData(p => ({ ...p, email: e.target.value }))}
+                                        placeholder="seu@email.com" className={`${inputCls} pl-10`} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className={`block mb-1.5 ${t.label(dark)}`}>WhatsApp</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <Phone className={`w-5 h-5 ${t.muted(dark)}`} />
+                                    </div>
+                                    <input required type="tel" value={visitorData.telefone} onChange={handlePhoneChange}
+                                        placeholder="(11) 99999-9999" minLength={14} maxLength={15} className={`${inputCls} pl-10`} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className={`block mb-1.5 ${t.label(dark)}`}>Estado</label>
+                                <div className="relative">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <MapPin className={`w-5 h-5 ${t.muted(dark)}`} />
+                                    </div>
+                                    <select required value={visitorData.estado} onChange={e => setVisitorData(p => ({ ...p, estado: e.target.value }))}
+                                        className={`${inputCls} pl-10 appearance-none`} style={{ backgroundColor: selectBg }}>
+                                        <option value="">Selecione...</option>
+                                        {ESTADOS.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={savingVisitor || !catalogoConfigured}
+                                className="w-full mt-6 bg-[#C01717] hover:bg-[#a01212] disabled:opacity-50 text-white font-bold text-base py-3.5 px-4 rounded-lg transition-all active:scale-95"
+                            >
+                                {savingVisitor ? 'Salvando...' : 'Acessar Catálogo'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* ── Header ───────────────────────────────────────────────── */}
             <header className={`border-b ${t.header(dark)} px-4 sm:px-8 py-3 flex items-center justify-between sticky top-0 z-20`}>
