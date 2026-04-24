@@ -69,6 +69,7 @@ export default function Catalogo() {
     const [error, setError] = useState('');
 
     const [visitorModal, setVisitorModal] = useState(false);
+    const [isReturning, setIsReturning] = useState(false);
     const [visitorData, setVisitorData] = useState({ nome: '', email: '', telefone: '', estado: '' });
     const [savingVisitor, setSavingVisitor] = useState(false);
 
@@ -141,17 +142,34 @@ export default function Catalogo() {
         e.preventDefault();
         setSavingVisitor(true);
         try {
+            const phoneClean = visitorData.telefone.replace(/\D/g, '');
+            
+            if (isReturning) {
+                const { data, error: err } = await supabase.from('visitantes_catalogo')
+                    .select('id')
+                    .eq('telefone', phoneClean)
+                    .single();
+                
+                if (err || !data) {
+                    alert('Cadastro não encontrado com este telefone. Por favor, preencha o formulário completo.');
+                    setIsReturning(false);
+                    return;
+                }
+                localStorage.setItem('kalled_visitante_id', data.id);
+                setVisitorModal(false);
+                return;
+            }
+
             const { data, error: err } = await supabase.from('visitantes_catalogo').insert([{
                 ...visitorData,
-                telefone: visitorData.telefone.replace(/\D/g, '')
+                telefone: phoneClean
             }]).select().single();
             
             if (err) {
-                // If unique constraint violation on phone, we just log them in
                 if (err.code === '23505') {
                     const { data: existing } = await supabase.from('visitantes_catalogo')
                         .select('id')
-                        .eq('telefone', visitorData.telefone.replace(/\D/g, ''))
+                        .eq('telefone', phoneClean)
                         .single();
                         
                     if (existing) {
@@ -165,7 +183,7 @@ export default function Catalogo() {
             localStorage.setItem('kalled_visitante_id', data.id);
             setVisitorModal(false);
         } catch (err: any) {
-            alert('Erro ao salvar identificação: ' + err.message);
+            alert('Erro ao processar identificação: ' + err.message);
         } finally {
             setSavingVisitor(false);
         }
@@ -186,31 +204,40 @@ export default function Catalogo() {
                             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#C01717]/10 mb-4">
                                 <span className="text-4xl font-black text-[#C01717] italic">K</span>
                             </div>
-                            <h2 className="text-2xl font-black mb-2">Bem-vindo ao Catálogo</h2>
-                            <p className={`text-sm ${t.muted(dark)}`}>Por favor, identifique-se para continuar.</p>
+                            <h2 className="text-2xl font-black mb-2">
+                                {isReturning ? 'Bem-vindo de volta!' : 'Bem-vindo ao Catálogo'}
+                            </h2>
+                            <p className={`text-sm ${t.muted(dark)}`}>
+                                {isReturning ? 'Digite seu telefone para acessar.' : 'Por favor, identifique-se para continuar.'}
+                            </p>
                         </div>
 
                         <form onSubmit={handleVisitorSubmit} className="space-y-4">
-                            <div>
-                                <label className={`block mb-1.5 ${t.label(dark)}`}>Nome Completo</label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <User className={`w-5 h-5 ${t.muted(dark)}`} />
+                            {!isReturning && (
+                                <>
+                                    <div>
+                                        <label className={`block mb-1.5 ${t.label(dark)}`}>Nome Completo</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <User className={`w-5 h-5 ${t.muted(dark)}`} />
+                                            </div>
+                                            <input required type="text" value={visitorData.nome} onChange={e => setVisitorData(p => ({ ...p, nome: e.target.value }))}
+                                                placeholder="Seu nome" className={`${inputCls} pl-10`} />
+                                        </div>
                                     </div>
-                                    <input required type="text" value={visitorData.nome} onChange={e => setVisitorData(p => ({ ...p, nome: e.target.value }))}
-                                        placeholder="Seu nome" className={`${inputCls} pl-10`} />
-                                </div>
-                            </div>
-                            <div>
-                                <label className={`block mb-1.5 ${t.label(dark)}`}>E-mail</label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <Mail className={`w-5 h-5 ${t.muted(dark)}`} />
+                                    <div>
+                                        <label className={`block mb-1.5 ${t.label(dark)}`}>E-mail</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <Mail className={`w-5 h-5 ${t.muted(dark)}`} />
+                                            </div>
+                                            <input required type="email" value={visitorData.email} onChange={e => setVisitorData(p => ({ ...p, email: e.target.value }))}
+                                                placeholder="seu@email.com" className={`${inputCls} pl-10`} />
+                                        </div>
                                     </div>
-                                    <input required type="email" value={visitorData.email} onChange={e => setVisitorData(p => ({ ...p, email: e.target.value }))}
-                                        placeholder="seu@email.com" className={`${inputCls} pl-10`} />
-                                </div>
-                            </div>
+                                </>
+                            )}
+                            
                             <div>
                                 <label className={`block mb-1.5 ${t.label(dark)}`}>WhatsApp</label>
                                 <div className="relative">
@@ -221,26 +248,44 @@ export default function Catalogo() {
                                         placeholder="(11) 99999-9999" minLength={14} maxLength={15} className={`${inputCls} pl-10`} />
                                 </div>
                             </div>
-                            <div>
-                                <label className={`block mb-1.5 ${t.label(dark)}`}>Estado</label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                        <MapPin className={`w-5 h-5 ${t.muted(dark)}`} />
+
+                            {!isReturning && (
+                                <div>
+                                    <label className={`block mb-1.5 ${t.label(dark)}`}>Estado</label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <MapPin className={`w-5 h-5 ${t.muted(dark)}`} />
+                                        </div>
+                                        <select required value={visitorData.estado} onChange={e => setVisitorData(p => ({ ...p, estado: e.target.value }))}
+                                            className={`${inputCls} pl-10 appearance-none`} style={{ backgroundColor: selectBg }}>
+                                            <option value="">Selecione...</option>
+                                            {ESTADOS.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+                                        </select>
                                     </div>
-                                    <select required value={visitorData.estado} onChange={e => setVisitorData(p => ({ ...p, estado: e.target.value }))}
-                                        className={`${inputCls} pl-10 appearance-none`} style={{ backgroundColor: selectBg }}>
-                                        <option value="">Selecione...</option>
-                                        {ESTADOS.map(uf => <option key={uf} value={uf}>{uf}</option>)}
-                                    </select>
                                 </div>
-                            </div>
+                            )}
+
                             <button
                                 type="submit"
                                 disabled={savingVisitor || !catalogoConfigured}
-                                className="w-full mt-6 bg-[#C01717] hover:bg-[#a01212] disabled:opacity-50 text-white font-bold text-base py-3.5 px-4 rounded-lg transition-all active:scale-95"
+                                className="w-full mt-6 bg-[#C01717] hover:bg-[#a01212] disabled:opacity-50 text-white font-bold text-base py-3.5 px-4 rounded-lg transition-all active:scale-95 shadow-lg shadow-[#C01717]/20"
                             >
-                                {savingVisitor ? 'Salvando...' : 'Acessar Catálogo'}
+                                {savingVisitor ? 'Processando...' : (isReturning ? 'Entrar' : 'Acessar Catálogo')}
                             </button>
+
+                            <div className="text-center mt-6">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsReturning(!isReturning)}
+                                    className={`text-sm font-medium transition-colors ${dark ? 'text-zinc-400 hover:text-white' : 'text-zinc-500 hover:text-zinc-900'}`}
+                                >
+                                    {isReturning ? (
+                                        <span>Novo por aqui? <span className="text-[#C01717] underline underline-offset-4">Criar cadastro</span></span>
+                                    ) : (
+                                        <span>Já tem cadastro? <span className="text-[#C01717] underline underline-offset-4">Clique aqui para entrar</span></span>
+                                    )}
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>
