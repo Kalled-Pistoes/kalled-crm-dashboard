@@ -191,11 +191,15 @@ export default function Catalogo() {
                                 <div>
                                     <label className={`block mb-1.5 ${t.label(dark)}`}>Nº do Produto / Código</label>
                                     <input type="text" value={filters.cod} onChange={e => set('cod', e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') handleSearch(e as unknown as React.FormEvent) }}
+                                        enterKeyHint="search"
                                         placeholder="Ex: P2110" className={inputCls} />
                                 </div>
                                 <div>
                                     <label className={`block mb-1.5 ${t.label(dark)}`}>Código de Referência de Concorrente</label>
                                     <input type="text" value={filters.ref} onChange={e => set('ref', e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') handleSearch(e as unknown as React.FormEvent) }}
+                                        enterKeyHint="search"
                                         placeholder="Ex: 4950, ML1234..." className={inputCls} />
                                 </div>
                             </div>
@@ -220,11 +224,15 @@ export default function Catalogo() {
                                 <div>
                                     <label className={`block mb-1.5 ${t.label(dark)}`}>Veículo / Modelo</label>
                                     <input type="text" value={filters.veiculo} onChange={e => set('veiculo', e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') handleSearch(e as unknown as React.FormEvent) }}
+                                        enterKeyHint="search"
                                         placeholder="Ex: Gol, Palio, Uno..." className={inputCls} />
                                 </div>
                                 <div>
                                     <label className={`block mb-1.5 ${t.label(dark)}`}>Motor</label>
                                     <input type="text" value={filters.motor} onChange={e => set('motor', e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') handleSearch(e as unknown as React.FormEvent) }}
+                                        enterKeyHint="search"
                                         placeholder="Ex: 1.0 8V, EA111..." className={inputCls} />
                                 </div>
                             </div>
