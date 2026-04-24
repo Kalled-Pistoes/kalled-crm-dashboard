@@ -4,6 +4,7 @@ import { Search, X, Lock, Package, AlertCircle, Sun, Moon, Sparkles } from 'luci
 import { supabase, catalogoConfigured, type CatalogoProduto } from '../lib/supabase';
 
 interface Filters {
+    buscaGeral: string;
     cod: string;
     ref: string;
     montadora: string;
@@ -13,7 +14,7 @@ interface Filters {
     lancamentos: boolean;
 }
 
-const EMPTY: Filters = { cod: '', ref: '', montadora: '', veiculo: '', motor: '', grupo: '', lancamentos: false };
+const EMPTY: Filters = { buscaGeral: '', cod: '', ref: '', montadora: '', veiculo: '', motor: '', grupo: '', lancamentos: false };
 
 function useTheme() {
     const [dark, setDark] = useState<boolean>(() => {
@@ -91,6 +92,12 @@ export default function Catalogo() {
                 return;
             }
             let query = supabase.from('catalogo_produtos').select('*').order('cod').limit(200);
+            
+            if (filters.buscaGeral.trim()) {
+                const bg = filters.buscaGeral.trim();
+                query = query.or(`cod.ilike.%${bg}%,ref_metal_leve_sulloy.ilike.%${bg}%,ref_anel_kalled.ilike.%${bg}%,montadora.ilike.%${bg}%,veiculo.ilike.%${bg}%,motor.ilike.%${bg}%`);
+            }
+            
             if (filters.cod.trim())     query = query.ilike('cod', `%${filters.cod.trim()}%`);
             if (ref)                    query = query.or(`ref_metal_leve_sulloy.ilike.%${ref}%,ref_anel_kalled.ilike.%${ref}%`);
             if (filters.montadora)      query = query.eq('montadora', filters.montadora);
@@ -184,6 +191,20 @@ export default function Catalogo() {
                     )}
 
                     <form onSubmit={handleSearch}>
+                        {/* Seção 0 — Busca Geral */}
+                        <div className={`mb-5 pb-5 border-b ${t.divider(dark)}`}>
+                            <p className={`text-xs font-black uppercase tracking-widest mb-3 ${t.muted(dark)}`}>Busca Geral</p>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <Search className={`w-5 h-5 ${t.muted(dark)}`} />
+                                </div>
+                                <input type="text" value={filters.buscaGeral} onChange={e => set('buscaGeral', e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') handleSearch(e as unknown as React.FormEvent) }}
+                                    enterKeyHint="search"
+                                    placeholder="Digite montadora, código, veículo, motor ou concorrência..." className={`${inputCls} pl-10`} />
+                            </div>
+                        </div>
+
                         {/* Seção 1 — Identificação do Produto */}
                         <div className={`mb-1 pb-1`}>
                             <p className={`text-xs font-black uppercase tracking-widest mb-3 ${t.muted(dark)}`}>Identificação do Produto</p>
