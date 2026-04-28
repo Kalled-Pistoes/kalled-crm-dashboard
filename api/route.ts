@@ -735,13 +735,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             // ── vendas ────────────────────────────────────────────────────
+            const clientToRepNameMap = new Map<string, string>();
+            for (const c of rawClientes) {
+                const cNome = String(getVal(c, 'Cliente', 'cliente') || '').trim();
+                const rNome = String(getVal(c, 'Representante', 'representante') || '').trim();
+                if (cNome && rNome) clientToRepNameMap.set(cNome, rNome);
+            }
+
             const vendasRows = rawVendas.map((r:any) => {
                 const data = parseDate(getVal(r,'Data','data'));
                 const cliente = String(getVal(r,'Cliente','cliente')||'').trim();
                 const sku = String(getVal(r,'Código (SKU)','Codigo','codigo','PN','pn')||'').trim();
                 if (!data||!cliente) return null;
-                const repNome = rawClientes.find((c:any)=>String(getVal(c,'Cliente','cliente')||'').trim()===cliente);
-                const repId = repNome ? repMap.get(String(getVal(repNome,'Representante','representante')||'').trim()) : undefined;
+                
+                const repNomeStr = clientToRepNameMap.get(cliente);
+                const repId = repNomeStr ? repMap.get(repNomeStr) : undefined;
+                
                 return { data, cliente_id: findCliId(cliente), produto_id: prodMap.get(sku)||null, quantidade: parseCurrency(getVal(r,'Quantidade','quantidade'))||null, valor: parseCurrency(getVal(r,'Valor','valor'))||null, representante_id: repId||null };
             }).filter(Boolean);
             vendasCount = await insertBatch('vendas', vendasRows as any[]);
@@ -826,6 +835,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         diametro_cilindro: cn(col(r,'DIAMETRO DO CILINDRO','DIÂMETRO DO CILINDRO','diametro_cilindro')),
                         ref_metal_leve_sulloy: cl(col(r,'CÓD REF METAL LEVE / SULOY','CÓD REF METAL LEVE / SULLOY','COD REF METAL LEVE / SULOY','ref_metal_leve_sulloy')),
                         ref_anel_kalled: cl(col(r,'REF ANEL KALLED','ref_anel_kalled')),
+                        espessura_canaletas: cl(col(r,'ESPESSURA DAS CANALETAS','ESPESSURA CANALETAS','ESPESSURA DE CANALETAS','Espessura das Canaletas','Espessura de Canaletas','Espessura Canaletas','espessura_canaletas')),
                         lancamentos,
                         updated_at: new Date().toISOString()
                     };

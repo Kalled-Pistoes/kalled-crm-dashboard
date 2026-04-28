@@ -592,6 +592,12 @@ export default function Catalogo() {
                                                 <p className="text-base font-semibold font-mono">{Number(p.diametro_cilindro).toFixed(2)} mm</p>
                                             </div>
                                         )}
+                                        {p.espessura_canaletas && (
+                                            <div>
+                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Esp. Canaletas</p>
+                                                <p className="text-base font-semibold font-mono">{p.espessura_canaletas}</p>
+                                            </div>
+                                        )}
                                         {p.qtd_pistoes && (
                                             <div>
                                                 <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Pistões</p>

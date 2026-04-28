@@ -19,6 +19,7 @@ CREATE TABLE catalogo_produtos (
   diametro_cilindro     NUMERIC,
   ref_metal_leve_sulloy TEXT,
   ref_anel_kalled       TEXT,
+  espessura_canaletas   TEXT,
   created_at            TIMESTAMPTZ DEFAULT now(),
   updated_at            TIMESTAMPTZ DEFAULT now()
 );
