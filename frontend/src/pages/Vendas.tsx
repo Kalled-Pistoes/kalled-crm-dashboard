@@ -13,7 +13,7 @@ export default function Vendas() {
     const [dataFim, setDataFim] = useState('');
 
     const filters: Filters = {
-        ano: searchParams.get('ano') || '2024',
+        ano: searchParams.get('ano') || String(new Date().getFullYear()),
         mes: searchParams.get('mes') || undefined,
     };
 

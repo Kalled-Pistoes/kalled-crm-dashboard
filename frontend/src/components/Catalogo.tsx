@@ -55,6 +55,214 @@ const ESTADOS = [
     'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
 ];
 
+// ── ProdutoCard ───────────────────────────────────────────────────────────
+interface ProdutoCardProps {
+    p: CatalogoProduto;
+    dark: boolean;
+}
+
+function ProdutoCard({ p, dark }: ProdutoCardProps) {
+    const [expanded, setExpanded] = useState(false);
+    const hasExtras = !!(p.diametro_cilindro || p.sobremedida || p.qtd_pistoes || p.espessura_canaletas);
+
+    return (
+        <div
+            className={`relative flex flex-col overflow-hidden rounded-lg border transition-shadow duration-200 hover:shadow-md ${
+                dark
+                    ? 'bg-[#232328] border-[#333] hover:border-[#555]'
+                    : 'bg-white border-[#ddd] hover:border-[#bbb] shadow-sm'
+            }`}
+        >
+            {/* Borda lateral azul de destaque */}
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#1565a8] rounded-l-lg" />
+
+            {/* Cabeçalho — código + descrição */}
+            <div className={`pl-5 pr-4 pt-4 pb-3 border-b ${dark ? 'border-[#333]' : 'border-[#e8e8e8]'}`}>
+                <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <p className="text-[#1565a8] font-black text-xl leading-tight font-mono tracking-wide">
+                            {p.cod}
+                        </p>
+                        <p className={`text-sm font-semibold mt-0.5 ${dark ? 'text-[#c0c0c8]' : 'text-[#444]'}`}>
+                            {p.descricao ?? '—'}
+                        </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0 pt-0.5">
+                        {p.lancamentos && (
+                            <span className={`inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${
+                                dark ? 'bg-green-500/20 text-green-400 border border-green-500/40' : 'bg-green-50 text-green-700 border border-green-300'
+                            }`}>
+                                <Sparkles className="w-3 h-3" /> Novo
+                            </span>
+                        )}
+                        {p.grupo && (
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                dark ? 'bg-[#2a2a35] text-[#a0a0b0]' : 'bg-[#eef2f7] text-[#555]'
+                            }`}>
+                                {p.grupo}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Corpo — imagem placeholder + tabela de aplicações */}
+            <div className="pl-5 pr-4 py-4 flex gap-5 items-start">
+                {/* Imagem do produto */}
+                <div className={`flex-shrink-0 w-24 h-24 rounded-lg flex items-center justify-center border overflow-hidden ${
+                    dark ? 'bg-[#1a1a1e] border-[#333]' : 'bg-[#f5f5f5] border-[#e0e0e0]'
+                }`}>
+                    <Package className={`w-10 h-10 ${dark ? 'text-[#444]' : 'text-[#ccc]'}`} />
+                </div>
+
+                {/* Tabela de aplicações */}
+                <div className="flex-1 min-w-0 overflow-x-auto">
+                    <table className="w-full text-sm border-collapse">
+                        <thead>
+                            <tr>
+                                {p.montadora && (
+                                    <th className="text-left text-[10px] font-black uppercase tracking-widest pb-1.5 pr-5 whitespace-nowrap text-[#1565a8]">
+                                        {p.montadora}
+                                    </th>
+                                )}
+                                <th className={`text-left text-[10px] font-black uppercase tracking-widest pb-1.5 pr-5 whitespace-nowrap ${
+                                    dark ? 'text-[#8888aa]' : 'text-[#888]'
+                                }`}>Motor</th>
+                                <th className={`text-left text-[10px] font-black uppercase tracking-widest pb-1.5 pr-5 whitespace-nowrap ${
+                                    dark ? 'text-[#8888aa]' : 'text-[#888]'
+                                }`}>Ano Inicial</th>
+                                <th className={`text-left text-[10px] font-black uppercase tracking-widest pb-1.5 pr-5 whitespace-nowrap ${
+                                    dark ? 'text-[#8888aa]' : 'text-[#888]'
+                                }`}>Ano Final</th>
+                                {p.combustivel && (
+                                    <th className={`text-left text-[10px] font-black uppercase tracking-widest pb-1.5 whitespace-nowrap ${
+                                        dark ? 'text-[#8888aa]' : 'text-[#888]'
+                                    }`}>Combustível</th>
+                                )}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr className={`border-t ${dark ? 'border-[#2e2e34]' : 'border-[#e8e8e8]'}`}>
+                                {p.montadora && (
+                                    <td className={`py-2 pr-5 font-semibold whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
+                                        {p.veiculo ?? '—'}
+                                    </td>
+                                )}
+                                <td className={`py-2 pr-5 font-mono whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
+                                    {p.motor ?? '—'}
+                                </td>
+                                <td className={`py-2 pr-5 whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
+                                    {p.ano_aplicacao?.split(/[-–]/)[0]?.trim() ?? '—'}
+                                </td>
+                                <td className={`py-2 pr-5 whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
+                                    {(() => {
+                                        const parts = p.ano_aplicacao?.split(/[-–]/);
+                                        return parts && parts.length > 1 ? parts[1].trim() : (p.ano_aplicacao ?? '—');
+                                    })()}
+                                </td>
+                                {p.combustivel && (
+                                    <td className={`py-2 font-semibold whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
+                                        {p.combustivel}
+                                    </td>
+                                )}
+                            </tr>
+                            {/* Dados técnicos extras (expansível) */}
+                            {hasExtras && expanded && (
+                                <tr className={`border-t ${dark ? 'border-[#2e2e34]' : 'border-[#e8e8e8]'}`}>
+                                    <td colSpan={5} className="pt-2.5 pb-0">
+                                        <div className="flex flex-wrap gap-4">
+                                            {p.diametro_cilindro && (
+                                                <span className={`text-xs ${dark ? 'text-[#a0a0b0]' : 'text-[#666]'}`}>
+                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>Diâmetro:</span>
+                                                    {Number(p.diametro_cilindro).toFixed(2)} mm
+                                                </span>
+                                            )}
+                                            {p.sobremedida && (
+                                                <span className={`text-xs ${dark ? 'text-[#a0a0b0]' : 'text-[#666]'}`}>
+                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>Sobremedida:</span>
+                                                    {p.sobremedida}
+                                                </span>
+                                            )}
+                                            {p.qtd_pistoes && (
+                                                <span className={`text-xs ${dark ? 'text-[#a0a0b0]' : 'text-[#666]'}`}>
+                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>Pistões:</span>
+                                                    {p.qtd_pistoes} un
+                                                </span>
+                                            )}
+                                            {p.espessura_canaletas && (
+                                                <span className={`text-xs ${dark ? 'text-[#a0a0b0]' : 'text-[#666]'}`}>
+                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>Canaletas:</span>
+                                                    {p.espessura_canaletas}
+                                                </span>
+                                            )}
+                                            {p.pa && (
+                                                <span className={`text-xs ${dark ? 'text-[#a0a0b0]' : 'text-[#666]'}`}>
+                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>PA:</span>
+                                                    {p.pa}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {/* Rodapé — logo Kalled + refs + botão Ver mais */}
+            <div className={`pl-5 pr-4 py-2.5 border-t flex items-center justify-between gap-3 ${
+                dark ? 'border-[#333] bg-[#1c1c21]' : 'border-[#e8e8e8] bg-[#f7f8fa]'
+            }`}>
+                <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+                    {/* Logo Kalled */}
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                        <div className={`w-5 h-5 rounded flex items-center justify-center ${
+                            dark ? 'bg-[#C01717]/20' : 'bg-[#C01717]/10'
+                        }`}>
+                            <span className="text-[#C01717] text-[10px] font-black italic">K</span>
+                        </div>
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${dark ? 'text-[#777]' : 'text-[#999]'}`}>
+                            Kalled
+                        </span>
+                    </div>
+
+                    {/* Refs de concorrentes */}
+                    <div className="flex flex-wrap gap-1.5 min-w-0">
+                        {p.ref_metal_leve_sulloy && (
+                            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                dark ? 'bg-sky-500/15 text-sky-400' : 'bg-sky-50 text-sky-600'
+                            }`}>
+                                {p.ref_metal_leve_sulloy}
+                            </span>
+                        )}
+                        {p.ref_anel_kalled && (
+                            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                dark ? 'bg-violet-500/15 text-violet-400' : 'bg-violet-50 text-violet-600'
+                            }`}>
+                                {p.ref_anel_kalled}
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                {/* Botão Ver mais */}
+                {hasExtras && (
+                    <button
+                        onClick={() => setExpanded(e => !e)}
+                        className="flex-shrink-0 text-white text-xs font-bold px-4 py-1.5 rounded transition-colors duration-150 cursor-pointer"
+                        style={{ backgroundColor: expanded ? '#0d4a7a' : '#1565a8' }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = expanded ? '#0a3d68' : '#1254921'.length > 1 ? '#1254a1' : '#0d4a7a')}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = expanded ? '#0d4a7a' : '#1565a8')}
+                    >
+                        {expanded ? 'Ver menos' : 'Ver mais'}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function Catalogo() {
     const navigate = useNavigate();
     const { dark, toggle } = useTheme();
@@ -520,117 +728,18 @@ export default function Catalogo() {
 
                 {searched && !loading && results.length > 0 && (
                     <>
-                        <div className="flex items-center justify-between mb-4">
-                            <p className={`text-base font-semibold ${t.muted(dark)}`}>
-                                <span className="text-[#C01717] font-black text-lg">{results.length}</span>
-                                {' '}resultado{results.length !== 1 ? 's' : ''} encontrado{results.length !== 1 ? 's' : ''}
+                        <div className="flex items-center justify-between mb-5">
+                            <p className={`text-sm font-semibold italic ${t.muted(dark)}`}>
+                                <span className="not-italic text-[#C01717] font-black text-base">{results.length}</span>
+                                {' '}produto{results.length !== 1 ? 's' : ''} encontrado{results.length !== 1 ? 's' : ''}
                                 {results.length === 200 ? ' — mostrando os primeiros 200' : ''}
                             </p>
                         </div>
 
-                        {/* Cards — desktop e mobile unificados */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
+                        {/* Cards — layout estilo catálogo web */}
+                        <div className="flex flex-col gap-4">
                             {results.map(p => (
-                                <div key={p.id} className={`${t.card(dark)} flex flex-col overflow-hidden`}>
-                                    {/* Cabeçalho vermelho */}
-                                    <div className="bg-[#C01717] px-5 py-4 flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                            <p className="text-white/70 text-xs font-bold uppercase tracking-wider mb-0.5">Código</p>
-                                            <p className="text-white font-black text-2xl leading-tight font-mono">{p.cod}</p>
-                                            {p.pa && <p className="text-white/60 text-xs font-mono mt-0.5">{p.pa}</p>}
-                                        </div>
-                                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                                            {p.lancamentos && (
-                                                <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${t.badge(dark)}`}>
-                                                    <Sparkles className="w-3 h-3" /> Novo
-                                                </span>
-                                            )}
-                                            {p.grupo && (
-                                                <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-white/20 text-white">
-                                                    {p.grupo}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Descrição */}
-                                    <div className={`px-5 py-3 border-b ${t.divider(dark)}`}>
-                                        <p className="text-base font-bold leading-snug">
-                                            {p.descricao ?? '—'}
-                                        </p>
-                                    </div>
-
-                                    {/* Dados do veículo */}
-                                    <div className="px-5 py-4 flex-1 grid grid-cols-2 gap-x-4 gap-y-3">
-                                        {p.montadora && (
-                                            <div>
-                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Montadora</p>
-                                                <p className="text-base font-semibold">{p.montadora}</p>
-                                            </div>
-                                        )}
-                                        {p.veiculo && (
-                                            <div>
-                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Veículo</p>
-                                                <p className="text-base font-semibold">{p.veiculo}</p>
-                                            </div>
-                                        )}
-                                        {p.ano_aplicacao && (
-                                            <div>
-                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Ano</p>
-                                                <p className="text-base font-semibold">{p.ano_aplicacao}</p>
-                                            </div>
-                                        )}
-                                        {p.sobremedida && (
-                                            <div>
-                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Sobremedida</p>
-                                                <p className="text-base font-semibold">{p.sobremedida}</p>
-                                            </div>
-                                        )}
-                                        {p.diametro_cilindro && (
-                                            <div>
-                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Diâmetro</p>
-                                                <p className="text-base font-semibold font-mono">{Number(p.diametro_cilindro).toFixed(2)} mm</p>
-                                            </div>
-                                        )}
-                                        {p.espessura_canaletas && (
-                                            <div>
-                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Esp. Canaletas</p>
-                                                <p className="text-base font-semibold font-mono">{p.espessura_canaletas}</p>
-                                            </div>
-                                        )}
-                                        {p.qtd_pistoes && (
-                                            <div>
-                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Pistões</p>
-                                                <p className="text-base font-semibold">{p.qtd_pistoes} un</p>
-                                            </div>
-                                        )}
-                                        {p.motor && (
-                                            <div className="col-span-2">
-                                                <p className={`text-[10px] font-black uppercase tracking-widest mb-0.5 ${t.muted(dark)}`}>Motor</p>
-                                                <p className="text-base font-semibold">{p.motor}</p>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Referências de concorrentes — rodapé */}
-                                    {(p.ref_metal_leve_sulloy || p.ref_anel_kalled) && (
-                                        <div className={`px-5 py-3 border-t ${t.divider(dark)} ${dark ? 'bg-[#1a1a1e]' : 'bg-[#f5f5f5]'}`}>
-                                            <p className={`text-[10px] font-black uppercase tracking-widest mb-1.5 ${t.muted(dark)}`}>Ref. Concorrente</p>
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {p.ref_metal_leve_sulloy && (
-                                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${dark ? 'bg-sky-500/15 text-sky-300' : 'bg-sky-100 text-sky-700'}`}>
-                                                        {p.ref_metal_leve_sulloy}
-                                                    </span>
-                                                )}
-                                                {p.ref_anel_kalled && (
-                                                    <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded ${dark ? 'bg-violet-500/15 text-violet-300' : 'bg-violet-100 text-violet-700'}`}>
-                                                        {p.ref_anel_kalled}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                                <ProdutoCard key={p.id} p={p} dark={dark} />
                             ))}
                         </div>
                     </>

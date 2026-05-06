@@ -21,7 +21,7 @@ export default function Layout() {
     const isRepresentantesPage = pathname === '/representantes';
     const isSyncPage = pathname === '/sync';
 
-    const currentAno = searchParams.get('ano') || '2024';
+    const currentAno = searchParams.get('ano') || String(new Date().getFullYear());
     const currentMes = searchParams.get('mes') || '';
 
     const setFilter = (key: string, value: string) => {
@@ -34,7 +34,13 @@ export default function Layout() {
         setSearchParams(newParams);
     };
 
-    const anos = ['2023', '2024', '2025', '2026'];
+    const currentYear = new Date().getFullYear();
+    const anos = [
+        String(currentYear - 2),
+        String(currentYear - 1),
+        String(currentYear),
+        String(currentYear + 1)
+    ];
     const meses = [
         { val: '01', label: 'Janeiro' },
         { val: '02', label: 'Fevereiro' },

@@ -31,7 +31,7 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
 
     const filters: Filters = {
-        ano: searchParams.get('ano') || '2024',
+        ano: searchParams.get('ano') || String(new Date().getFullYear()),
         mes: searchParams.get('mes') || undefined,
         grupo: searchParams.get('grupo') || undefined,
     };
