@@ -73,14 +73,14 @@ function ProdutoCard({ p, dark }: ProdutoCardProps) {
                     : 'bg-white border-[#ddd] hover:border-[#bbb] shadow-sm'
             }`}
         >
-            {/* Borda lateral azul de destaque */}
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#1565a8] rounded-l-lg" />
+            {/* Borda lateral vermelha de destaque */}
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#C01717] rounded-l-lg" />
 
             {/* Cabeçalho — código + descrição */}
             <div className={`pl-5 pr-4 pt-4 pb-3 border-b ${dark ? 'border-[#333]' : 'border-[#e8e8e8]'}`}>
                 <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                        <p className="text-[#1565a8] font-black text-xl leading-tight font-mono tracking-wide">
+                        <p className="text-[#C01717] font-black text-xl leading-tight font-mono tracking-wide">
                             {p.cod}
                         </p>
                         <p className={`text-sm font-semibold mt-0.5 ${dark ? 'text-[#c0c0c8]' : 'text-[#444]'}`}>
@@ -121,7 +121,7 @@ function ProdutoCard({ p, dark }: ProdutoCardProps) {
                         <thead>
                             <tr>
                                 {p.montadora && (
-                                    <th className="text-left text-[10px] font-black uppercase tracking-widest pb-1.5 pr-5 whitespace-nowrap text-[#1565a8]">
+                                    <th className="text-left text-[10px] font-black uppercase tracking-widest pb-1.5 pr-5 whitespace-nowrap text-[#C01717]">
                                         {p.montadora}
                                     </th>
                                 )}
@@ -251,9 +251,9 @@ function ProdutoCard({ p, dark }: ProdutoCardProps) {
                     <button
                         onClick={() => setExpanded(e => !e)}
                         className="flex-shrink-0 text-white text-xs font-bold px-4 py-1.5 rounded transition-colors duration-150 cursor-pointer"
-                        style={{ backgroundColor: expanded ? '#0d4a7a' : '#1565a8' }}
-                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = expanded ? '#0a3d68' : '#1254921'.length > 1 ? '#1254a1' : '#0d4a7a')}
-                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = expanded ? '#0d4a7a' : '#1565a8')}
+                        style={{ backgroundColor: expanded ? '#a01212' : '#C01717' }}
+                        onMouseEnter={e => (e.currentTarget.style.backgroundColor = expanded ? '#800e0e' : '#b01515')}
+                        onMouseLeave={e => (e.currentTarget.style.backgroundColor = expanded ? '#a01212' : '#C01717')}
                     >
                         {expanded ? 'Ver menos' : 'Ver mais'}
                     </button>
