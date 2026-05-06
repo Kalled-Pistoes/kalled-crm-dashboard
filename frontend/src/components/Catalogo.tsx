@@ -65,13 +65,29 @@ function ProdutoCard({ p, dark }: ProdutoCardProps) {
     const [expanded, setExpanded] = useState(false);
     const hasExtras = !!(p.diametro_cilindro || p.sobremedida || p.qtd_pistoes || p.espessura_canaletas);
 
-    // Divide veículos separados por '/' e anos do intervalo
-    const veiculos = p.veiculo
+    // Divide veículos e anos separados por '/' e cruza cada par (veiculo[i] <-> ano[i])
+    const veiculosList = p.veiculo
         ? p.veiculo.split('/').map((v: string) => v.trim()).filter(Boolean)
         : ['—'];
-    const anoParts = p.ano_aplicacao?.split(/[-–]/) ?? [];
-    const anoInicial = anoParts[0]?.trim() ?? '—';
-    const anoFinal = anoParts.length > 1 ? anoParts[1].trim() : (p.ano_aplicacao ?? '—');
+    const anosList = p.ano_aplicacao
+        ? p.ano_aplicacao.split('/').map((a: string) => a.trim()).filter(Boolean)
+        : [];
+
+    // Função que separa um intervalo de ano (ex: "2008-2022") em {ini, fim}
+    const parseAno = (raw: string) => {
+        // Separa por hífen ou en-dash, mas cuidando de não quebrar no primeiro hífen de um ano negativo
+        const parts = raw.split(/(?<=\d{4})[-–](?=\d)/);
+        return {
+            ini: parts[0]?.trim() ?? '—',
+            fim: parts.length > 1 ? parts[parts.length - 1].trim() : (parts[0]?.trim() ?? '—'),
+        };
+    };
+
+    // Monta as linhas da tabela cruzando veículo[i] com ano[i] (ou ano único se só houver um)
+    const linhas = veiculosList.map((veiculo, idx) => {
+        const anoRaw = anosList[idx] ?? anosList[0] ?? '';
+        return { veiculo, ...parseAno(anoRaw) };
+    });
 
     return (
         <div
@@ -150,22 +166,22 @@ function ProdutoCard({ p, dark }: ProdutoCardProps) {
                             </tr>
                         </thead>
                         <tbody>
-                            {/* Uma linha por veículo (campo dividido por '/') */}
-                            {veiculos.map((veiculo, idx) => (
+                            {/* Uma linha por veículo, com o intervalo de anos correspondente */}
+                            {linhas.map((linha, idx) => (
                                 <tr key={idx} className={`border-t ${dark ? 'border-[#2e2e34]' : 'border-[#e8e8e8]'}`}>
                                     {p.montadora && (
                                         <td className={`py-2 pr-5 font-semibold whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
-                                            {veiculo}
+                                            {linha.veiculo}
                                         </td>
                                     )}
                                     <td className={`py-2 pr-5 font-mono text-xs whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
                                         {p.motor ?? '—'}
                                     </td>
                                     <td className={`py-2 pr-5 whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
-                                        {anoInicial}
+                                        {linha.ini}
                                     </td>
                                     <td className={`py-2 pr-5 whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
-                                        {anoFinal}
+                                        {linha.fim}
                                     </td>
                                     {p.combustivel && (
                                         <td className={`py-2 font-semibold whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
