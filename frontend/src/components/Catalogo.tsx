@@ -65,6 +65,14 @@ function ProdutoCard({ p, dark }: ProdutoCardProps) {
     const [expanded, setExpanded] = useState(false);
     const hasExtras = !!(p.diametro_cilindro || p.sobremedida || p.qtd_pistoes || p.espessura_canaletas);
 
+    // Divide veículos separados por '/' e anos do intervalo
+    const veiculos = p.veiculo
+        ? p.veiculo.split('/').map((v: string) => v.trim()).filter(Boolean)
+        : ['—'];
+    const anoParts = p.ano_aplicacao?.split(/[-–]/) ?? [];
+    const anoInicial = anoParts[0]?.trim() ?? '—';
+    const anoFinal = anoParts.length > 1 ? anoParts[1].trim() : (p.ano_aplicacao ?? '—');
+
     return (
         <div
             className={`relative flex flex-col overflow-hidden rounded-lg border transition-shadow duration-200 hover:shadow-md ${
@@ -142,30 +150,30 @@ function ProdutoCard({ p, dark }: ProdutoCardProps) {
                             </tr>
                         </thead>
                         <tbody>
-                            <tr className={`border-t ${dark ? 'border-[#2e2e34]' : 'border-[#e8e8e8]'}`}>
-                                {p.montadora && (
-                                    <td className={`py-2 pr-5 font-semibold whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
-                                        {p.veiculo ?? '—'}
+                            {/* Uma linha por veículo (campo dividido por '/') */}
+                            {veiculos.map((veiculo, idx) => (
+                                <tr key={idx} className={`border-t ${dark ? 'border-[#2e2e34]' : 'border-[#e8e8e8]'}`}>
+                                    {p.montadora && (
+                                        <td className={`py-2 pr-5 font-semibold whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
+                                            {veiculo}
+                                        </td>
+                                    )}
+                                    <td className={`py-2 pr-5 font-mono text-xs whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
+                                        {p.motor ?? '—'}
                                     </td>
-                                )}
-                                <td className={`py-2 pr-5 font-mono whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
-                                    {p.motor ?? '—'}
-                                </td>
-                                <td className={`py-2 pr-5 whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
-                                    {p.ano_aplicacao?.split(/[-–]/)[0]?.trim() ?? '—'}
-                                </td>
-                                <td className={`py-2 pr-5 whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
-                                    {(() => {
-                                        const parts = p.ano_aplicacao?.split(/[-–]/);
-                                        return parts && parts.length > 1 ? parts[1].trim() : (p.ano_aplicacao ?? '—');
-                                    })()}
-                                </td>
-                                {p.combustivel && (
-                                    <td className={`py-2 font-semibold whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
-                                        {p.combustivel}
+                                    <td className={`py-2 pr-5 whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
+                                        {anoInicial}
                                     </td>
-                                )}
-                            </tr>
+                                    <td className={`py-2 pr-5 whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
+                                        {anoFinal}
+                                    </td>
+                                    {p.combustivel && (
+                                        <td className={`py-2 font-semibold whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
+                                            {p.combustivel}
+                                        </td>
+                                    )}
+                                </tr>
+                            ))}
                             {/* Dados técnicos extras (expansível) */}
                             {hasExtras && expanded && (
                                 <tr className={`border-t ${dark ? 'border-[#2e2e34]' : 'border-[#e8e8e8]'}`}>
