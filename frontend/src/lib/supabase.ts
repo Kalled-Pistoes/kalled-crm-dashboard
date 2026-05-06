@@ -22,6 +22,7 @@ export interface CatalogoProduto {
     ref_anel_kalled: string | null;
     espessura_canaletas: string | null;
     lancamentos: boolean | null;
+    combustivel: string | null;
 }
 
 export const catalogoConfigured = !!(url && key);
