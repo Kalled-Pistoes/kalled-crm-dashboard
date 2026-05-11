@@ -59,9 +59,10 @@ const ESTADOS = [
 interface ProdutoCardProps {
     p: CatalogoProduto;
     dark: boolean;
+    onOpenImage: () => void;
 }
 
-function ProdutoCard({ p, dark }: ProdutoCardProps) {
+function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
     const [expanded, setExpanded] = useState(false);
     const hasExtras = !!(p.diametro_cilindro || p.sobremedida || p.qtd_pistoes || p.espessura_canaletas || p.pa || p.anel_kalled);
 
@@ -133,7 +134,9 @@ function ProdutoCard({ p, dark }: ProdutoCardProps) {
             {/* Corpo — imagem placeholder + tabela de aplicações */}
             <div className="pl-5 pr-4 py-4 flex gap-5 items-start">
                 {/* Imagem do produto */}
-                <div className={`flex-shrink-0 w-24 h-24 rounded-lg flex items-center justify-center border overflow-hidden ${
+                <div 
+                    onClick={onOpenImage}
+                    className={`flex-shrink-0 w-24 h-24 rounded-lg flex items-center justify-center border overflow-hidden cursor-pointer hover:opacity-80 transition-opacity ${
                     dark ? 'bg-[#1a1a1e] border-[#333]' : 'bg-[#f5f5f5] border-[#e0e0e0]'
                 }`}>
                     <Package className={`w-10 h-10 ${dark ? 'text-[#444]' : 'text-[#ccc]'}`} />
@@ -322,6 +325,9 @@ export default function Catalogo() {
     const [isReturning, setIsReturning] = useState(false);
     const [visitorData, setVisitorData] = useState({ nome: '', email: '', telefone: '', estado: '' });
     const [savingVisitor, setSavingVisitor] = useState(false);
+
+    const [showImageModal, setShowImageModal] = useState(false);
+    const [selectedProduct, setSelectedProduct] = useState<CatalogoProduto | null>(null);
 
     useEffect(() => {
         if (!localStorage.getItem('kalled_visitante_id')) {
@@ -781,7 +787,15 @@ export default function Catalogo() {
                         {/* Cards — layout estilo catálogo web */}
                         <div className="flex flex-col gap-4">
                             {results.map(p => (
-                                <ProdutoCard key={p.id} p={p} dark={dark} />
+                                <ProdutoCard 
+                                    key={p.id} 
+                                    p={p} 
+                                    dark={dark} 
+                                    onOpenImage={() => {
+                                        setSelectedProduct(p);
+                                        setShowImageModal(true);
+                                    }}
+                                />
                             ))}
                         </div>
                     </>
@@ -794,6 +808,43 @@ export default function Catalogo() {
                     © {new Date().getFullYear()} Kalled Pistões · Todos os direitos reservados
                 </p>
             </footer>
+
+            {/* Modal de Imagem */}
+            {showImageModal && selectedProduct && (
+                <div 
+                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm"
+                    onClick={() => setShowImageModal(false)}
+                >
+                    <div 
+                        className="relative max-w-4xl w-full flex flex-col items-center"
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <button 
+                            onClick={() => setShowImageModal(false)}
+                            className="absolute -top-12 right-0 text-white hover:text-[#C01717] transition-colors p-2"
+                        >
+                            <X className="w-8 h-8" />
+                        </button>
+                        
+                        <div className={`p-6 rounded-2xl ${dark ? 'bg-[#232328]' : 'bg-white'} shadow-2xl overflow-hidden border ${dark ? 'border-[#333]' : 'border-zinc-200'}`}>
+                            <div className={`aspect-square w-full max-w-[500px] flex items-center justify-center rounded-xl border ${dark ? 'bg-[#1a1a1e] border-[#333]' : 'bg-[#f5f5f5] border-[#e0e0e0]'}`}>
+                                <Package className={`w-32 h-32 ${dark ? 'text-[#444]' : 'text-[#ccc]'}`} />
+                            </div>
+                            
+                            <div className="mt-6 text-center">
+                                <span className="inline-block px-3 py-1 rounded-full bg-[#C01717]/10 text-[#C01717] text-xs font-black uppercase tracking-widest mb-2">
+                                    Cód. Kalled
+                                </span>
+                                <h3 className="text-3xl font-black text-[#C01717] font-mono leading-none">{selectedProduct.cod}</h3>
+                                <div className={`w-12 h-1 bg-[#C01717] mx-auto my-4 rounded-full`}></div>
+                                <p className={`text-lg font-semibold ${dark ? 'text-zinc-300' : 'text-zinc-700'}`}>
+                                    {selectedProduct.descricao}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

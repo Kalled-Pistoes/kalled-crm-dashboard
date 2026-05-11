@@ -26,6 +26,7 @@ export interface CatalogoProduto {
     combustivel: string | null;
     medida_haste: string | null;
     comprimento_total: string | null;
+    image_url: string | null;
 }
 
 export const catalogoConfigured = !!(url && key);
