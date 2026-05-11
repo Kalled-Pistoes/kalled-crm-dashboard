@@ -245,14 +245,14 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
                                                 </span>
                                             )}
                                             {p.anel_kalled && (
-                                                <span className={`text-xs font-bold ${dark ? 'text-[#e05050]' : 'text-[#C01717]'}`}>
-                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#aa3333]' : 'text-[#C01717]'}`}>Anel Kalled:</span>
+                                                <span className={`text-xs ${dark ? 'text-[#a0a0b0]' : 'text-[#666]'}`}>
+                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>Anel Kalled:</span>
                                                     {p.anel_kalled}
                                                 </span>
                                             )}
                                             {p.ref_metal_leve_sulloy && (
                                                 <span className={`text-xs ${dark ? 'text-[#a0a0b0]' : 'text-[#666]'}`}>
-                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>Ref. Conc. Pistão:</span>
+                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>REF. PISTÃO:</span>
                                                     <span className={`font-mono font-bold px-1.5 py-0.5 rounded ${dark ? 'bg-red-500/15 text-red-400' : 'bg-red-50 text-red-600'}`}>
                                                         {p.ref_metal_leve_sulloy}
                                                     </span>
@@ -260,7 +260,7 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
                                             )}
                                             {p.ref_anel_kalled && (
                                                 <span className={`text-xs ${dark ? 'text-[#a0a0b0]' : 'text-[#666]'}`}>
-                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>Ref. Conc. Anel:</span>
+                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>REF. ANEL:</span>
                                                     <span className={`font-mono font-bold px-1.5 py-0.5 rounded ${dark ? 'bg-red-500/15 text-red-400' : 'bg-red-50 text-red-600'}`}>
                                                         {p.ref_anel_kalled}
                                                     </span>
