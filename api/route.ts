@@ -855,6 +855,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         anel_kalled: cl(col(r,'ANEL KALLED','Anel Kalled','anel_kalled')),
                         observacao: cl(col(r,'OBSERVAÇÃO','OBSERVACAO','Observação','Observacao','obs','OBS')),
                         tipo: cl(col(r,'TIPO','Tipo','tipo')),
+                        combustivel: cl(col(r,'COMBUSTÍVEL','COMBUSTIVEL','Combustível','Combustivel','combustivel')),
+                        medida_haste: cl(col(r,'MEDIDA DA HASTE','MEDIDA HASTE','medida_haste')),
+                        comprimento_total: cl(col(r,'COMPRIMENTO TOTAL','comprimento_total')),
+                        image_url: cl(col(r,'URL DA IMAGEM','IMAGE URL','image_url')),
                         lancamentos,
                         updated_at: new Date().toISOString()
                     };

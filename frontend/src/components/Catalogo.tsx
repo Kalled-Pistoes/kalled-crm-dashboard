@@ -64,7 +64,7 @@ interface ProdutoCardProps {
 
 function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
     const [expanded, setExpanded] = useState(false);
-    const hasExtras = !!(p.diametro_cilindro || p.sobremedida || p.qtd_pistoes || p.espessura_canaletas || p.pa || p.anel_kalled);
+    const hasExtras = !!(p.diametro_cilindro || p.sobremedida || p.qtd_pistoes || p.espessura_canaletas || p.pa || p.anel_kalled || p.ref_metal_leve_sulloy || p.ref_anel_kalled);
 
     // Divide veículos e anos separados por '/' e cruza cada par (veiculo[i] <-> ano[i])
     const veiculosList = p.veiculo
@@ -139,7 +139,11 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
                     className={`flex-shrink-0 w-24 h-24 rounded-lg flex items-center justify-center border overflow-hidden cursor-pointer hover:opacity-80 transition-opacity ${
                     dark ? 'bg-[#1a1a1e] border-[#333]' : 'bg-[#f5f5f5] border-[#e0e0e0]'
                 }`}>
-                    <Package className={`w-10 h-10 ${dark ? 'text-[#444]' : 'text-[#ccc]'}`} />
+                    {p.image_url ? (
+                        <img src={p.image_url} alt={p.cod} className="w-full h-full object-cover" />
+                    ) : (
+                        <Package className={`w-10 h-10 ${dark ? 'text-[#444]' : 'text-[#ccc]'}`} />
+                    )}
                 </div>
 
                 {/* Tabela de aplicações */}
@@ -166,12 +170,6 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
                                         dark ? 'text-[#8888aa]' : 'text-[#888]'
                                     }`}>Combustível</th>
                                 )}
-                                <th className={`text-left text-[10px] font-black uppercase tracking-widest pb-1.5 pr-5 whitespace-nowrap ${
-                                    dark ? 'text-[#8888aa]' : 'text-[#888]'
-                                }`}>PA</th>
-                                <th className={`text-left text-[10px] font-black uppercase tracking-widest pb-1.5 pr-5 whitespace-nowrap ${
-                                    dark ? 'text-[#8888aa]' : 'text-[#888]'
-                                }`}>Anel Kalled</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -197,12 +195,6 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
                                             {p.combustivel}
                                         </td>
                                     )}
-                                    <td className={`py-2 pr-5 font-bold whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
-                                        {p.pa ?? '—'}
-                                    </td>
-                                    <td className={`py-2 pr-5 font-bold whitespace-nowrap ${dark ? 'text-[#e05050]' : 'text-[#C01717]'}`}>
-                                        {p.anel_kalled ?? '—'}
-                                    </td>
                                 </tr>
                             ))}
                             {/* Dados técnicos extras (expansível) */}
@@ -234,6 +226,18 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
                                                     {p.espessura_canaletas}
                                                 </span>
                                             )}
+                                            {p.medida_haste && (
+                                                <span className={`text-xs ${dark ? 'text-[#a0a0b0]' : 'text-[#666]'}`}>
+                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>Medida Haste:</span>
+                                                    {p.medida_haste}
+                                                </span>
+                                            )}
+                                            {p.comprimento_total && (
+                                                <span className={`text-xs ${dark ? 'text-[#a0a0b0]' : 'text-[#666]'}`}>
+                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>Comp. Total:</span>
+                                                    {p.comprimento_total}
+                                                </span>
+                                            )}
                                             {p.pa && (
                                                 <span className={`text-xs ${dark ? 'text-[#a0a0b0]' : 'text-[#666]'}`}>
                                                     <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>PA:</span>
@@ -244,6 +248,22 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
                                                 <span className={`text-xs font-bold ${dark ? 'text-[#e05050]' : 'text-[#C01717]'}`}>
                                                     <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#aa3333]' : 'text-[#C01717]'}`}>Anel Kalled:</span>
                                                     {p.anel_kalled}
+                                                </span>
+                                            )}
+                                            {p.ref_metal_leve_sulloy && (
+                                                <span className={`text-xs ${dark ? 'text-[#a0a0b0]' : 'text-[#666]'}`}>
+                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>Ref. Conc. Pistão:</span>
+                                                    <span className={`font-mono font-bold px-1.5 py-0.5 rounded ${dark ? 'bg-red-500/15 text-red-400' : 'bg-red-50 text-red-600'}`}>
+                                                        {p.ref_metal_leve_sulloy}
+                                                    </span>
+                                                </span>
+                                            )}
+                                            {p.ref_anel_kalled && (
+                                                <span className={`text-xs ${dark ? 'text-[#a0a0b0]' : 'text-[#666]'}`}>
+                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#666]' : 'text-[#888]'}`}>Ref. Conc. Anel:</span>
+                                                    <span className={`font-mono font-bold px-1.5 py-0.5 rounded ${dark ? 'bg-red-500/15 text-red-400' : 'bg-red-50 text-red-600'}`}>
+                                                        {p.ref_anel_kalled}
+                                                    </span>
                                                 </span>
                                             )}
                                         </div>
@@ -272,23 +292,6 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
                         </span>
                     </div>
 
-                    {/* Refs de concorrentes */}
-                    <div className="flex flex-wrap gap-1.5 min-w-0">
-                        {p.ref_metal_leve_sulloy && (
-                            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                                dark ? 'bg-red-500/15 text-red-400' : 'bg-red-50 text-red-600'
-                            }`}>
-                                {p.ref_metal_leve_sulloy}
-                            </span>
-                        )}
-                        {p.ref_anel_kalled && (
-                            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                                dark ? 'bg-red-500/15 text-red-400' : 'bg-red-50 text-red-600'
-                            }`}>
-                                {p.ref_anel_kalled}
-                            </span>
-                        )}
-                    </div>
                 </div>
 
                 {/* Botão Ver mais */}
@@ -339,8 +342,8 @@ export default function Catalogo() {
         if (!catalogoConfigured) return;
         async function loadOptions() {
             const [m, g] = await Promise.all([
-                supabase.from('catalogo_produtos').select('montadora').not('montadora', 'is', null),
-                supabase.from('catalogo_produtos').select('grupo').not('grupo', 'is', null),
+                supabase.from('catalogo_produtos').select('montadora').not('montadora', 'is', null).limit(10000),
+                supabase.from('catalogo_produtos').select('grupo').not('grupo', 'is', null).limit(10000),
             ]);
             const uniq = (arr: string[]) => [...new Set(arr)].sort();
             setMontadoras(uniq((m.data || []).map((r: any) => r.montadora).filter(Boolean)));
@@ -362,7 +365,7 @@ export default function Catalogo() {
                 setLoading(false);
                 return;
             }
-            let query = supabase.from('catalogo_produtos').select('*').order('cod').limit(1000);
+            let query = supabase.from('catalogo_produtos').select('*').order('cod').limit(5000);
             
             if (filters.buscaGeral.trim()) {
                 const bg = filters.buscaGeral.trim();
@@ -780,7 +783,7 @@ export default function Catalogo() {
                             <p className={`text-sm font-semibold italic ${t.muted(dark)}`}>
                                 <span className="not-italic text-[#C01717] font-black text-base">{results.length}</span>
                                 {' '}produto{results.length !== 1 ? 's' : ''} encontrado{results.length !== 1 ? 's' : ''}
-                                {results.length === 200 ? ' — mostrando os primeiros 200' : ''}
+                                {results.length === 5000 ? ' — mostrando os primeiros 5000' : ''}
                             </p>
                         </div>
 
@@ -827,8 +830,12 @@ export default function Catalogo() {
                         </button>
                         
                         <div className={`p-6 rounded-2xl ${dark ? 'bg-[#232328]' : 'bg-white'} shadow-2xl overflow-hidden border ${dark ? 'border-[#333]' : 'border-zinc-200'}`}>
-                            <div className={`aspect-square w-full max-w-[500px] flex items-center justify-center rounded-xl border ${dark ? 'bg-[#1a1a1e] border-[#333]' : 'bg-[#f5f5f5] border-[#e0e0e0]'}`}>
-                                <Package className={`w-32 h-32 ${dark ? 'text-[#444]' : 'text-[#ccc]'}`} />
+                            <div className={`aspect-square w-full max-w-[500px] flex items-center justify-center rounded-xl border overflow-hidden ${dark ? 'bg-[#1a1a1e] border-[#333]' : 'bg-[#f5f5f5] border-[#e0e0e0]'}`}>
+                                {selectedProduct.image_url ? (
+                                    <img src={selectedProduct.image_url} alt={selectedProduct.cod} className="max-w-full max-h-full object-contain" />
+                                ) : (
+                                    <Package className={`w-32 h-32 ${dark ? 'text-[#444]' : 'text-[#ccc]'}`} />
+                                )}
                             </div>
                             
                             <div className="mt-6 text-center">
