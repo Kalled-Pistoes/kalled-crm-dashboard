@@ -63,7 +63,7 @@ interface ProdutoCardProps {
 
 function ProdutoCard({ p, dark }: ProdutoCardProps) {
     const [expanded, setExpanded] = useState(false);
-    const hasExtras = !!(p.diametro_cilindro || p.sobremedida || p.qtd_pistoes || p.espessura_canaletas);
+    const hasExtras = !!(p.diametro_cilindro || p.sobremedida || p.qtd_pistoes || p.espessura_canaletas || p.pa || p.anel_kalled);
 
     // Divide veículos e anos separados por '/' e cruza cada par (veiculo[i] <-> ano[i])
     const veiculosList = p.veiculo
@@ -163,6 +163,12 @@ function ProdutoCard({ p, dark }: ProdutoCardProps) {
                                         dark ? 'text-[#8888aa]' : 'text-[#888]'
                                     }`}>Combustível</th>
                                 )}
+                                <th className={`text-left text-[10px] font-black uppercase tracking-widest pb-1.5 pr-5 whitespace-nowrap ${
+                                    dark ? 'text-[#8888aa]' : 'text-[#888]'
+                                }`}>PA</th>
+                                <th className={`text-left text-[10px] font-black uppercase tracking-widest pb-1.5 pr-5 whitespace-nowrap ${
+                                    dark ? 'text-[#8888aa]' : 'text-[#888]'
+                                }`}>Anel Kalled</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -188,6 +194,12 @@ function ProdutoCard({ p, dark }: ProdutoCardProps) {
                                             {p.combustivel}
                                         </td>
                                     )}
+                                    <td className={`py-2 pr-5 font-bold whitespace-nowrap ${dark ? 'text-[#d0d0d8]' : 'text-[#333]'}`}>
+                                        {p.pa ?? '—'}
+                                    </td>
+                                    <td className={`py-2 pr-5 font-bold whitespace-nowrap ${dark ? 'text-[#e05050]' : 'text-[#C01717]'}`}>
+                                        {p.anel_kalled ?? '—'}
+                                    </td>
                                 </tr>
                             ))}
                             {/* Dados técnicos extras (expansível) */}
@@ -225,6 +237,12 @@ function ProdutoCard({ p, dark }: ProdutoCardProps) {
                                                     {p.pa}
                                                 </span>
                                             )}
+                                            {p.anel_kalled && (
+                                                <span className={`text-xs font-bold ${dark ? 'text-[#e05050]' : 'text-[#C01717]'}`}>
+                                                    <span className={`font-black uppercase tracking-wide text-[10px] mr-1 ${dark ? 'text-[#aa3333]' : 'text-[#C01717]'}`}>Anel Kalled:</span>
+                                                    {p.anel_kalled}
+                                                </span>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -255,14 +273,14 @@ function ProdutoCard({ p, dark }: ProdutoCardProps) {
                     <div className="flex flex-wrap gap-1.5 min-w-0">
                         {p.ref_metal_leve_sulloy && (
                             <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                                dark ? 'bg-sky-500/15 text-sky-400' : 'bg-sky-50 text-sky-600'
+                                dark ? 'bg-red-500/15 text-red-400' : 'bg-red-50 text-red-600'
                             }`}>
                                 {p.ref_metal_leve_sulloy}
                             </span>
                         )}
                         {p.ref_anel_kalled && (
                             <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                                dark ? 'bg-violet-500/15 text-violet-400' : 'bg-violet-50 text-violet-600'
+                                dark ? 'bg-red-500/15 text-red-400' : 'bg-red-50 text-red-600'
                             }`}>
                                 {p.ref_anel_kalled}
                             </span>
@@ -338,7 +356,7 @@ export default function Catalogo() {
                 setLoading(false);
                 return;
             }
-            let query = supabase.from('catalogo_produtos').select('*').order('cod').limit(200);
+            let query = supabase.from('catalogo_produtos').select('*').order('cod').limit(1000);
             
             if (filters.buscaGeral.trim()) {
                 const bg = filters.buscaGeral.trim();

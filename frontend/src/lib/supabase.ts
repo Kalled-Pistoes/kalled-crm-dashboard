@@ -21,8 +21,11 @@ export interface CatalogoProduto {
     ref_metal_leve_sulloy: string | null;
     ref_anel_kalled: string | null;
     espessura_canaletas: string | null;
+    anel_kalled: string | null;
     lancamentos: boolean | null;
     combustivel: string | null;
+    medida_haste: string | null;
+    comprimento_total: string | null;
 }
 
 export const catalogoConfigured = !!(url && key);

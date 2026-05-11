@@ -523,13 +523,29 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // ── sync ────────────────────────────────────────────────────────────
         if (s0 === 'sync') {
-            if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
             const user = requireAuth(req, res);
             if (!user) return;
             if (!requireAdmin(user, res)) return;
 
+            if (req.method === 'GET') {
+                const { data, error } = await supabase.from('api_sync_status')
+                    .select('*').eq('id', '00000000-0000-0000-0000-000000000001').single();
+                if (error) return res.status(500).json({ error: error.message });
+                return res.json(data);
+            }
+
+            if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
             const { vendas: vendasB64, catalogo: catalogoB64 } = req.body || {};
             if (!vendasB64 && !catalogoB64) return res.status(400).json({ error: 'Envie ao menos um arquivo Excel (vendas ou catálogo)' });
+
+            await supabase.from('api_sync_status').update({
+                status: 'Sincronizando...',
+                error_message: null,
+                updated_at: new Date().toISOString()
+            }).eq('id', '00000000-0000-0000-0000-000000000001');
+
+            try {
 
             // ── helpers ──────────────────────────────────────────────────
             const parseCurrency = (v: any): number => {
@@ -836,6 +852,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         ref_metal_leve_sulloy: cl(col(r,'CÓD REF METAL LEVE / SULOY','CÓD REF METAL LEVE / SULLOY','COD REF METAL LEVE / SULOY','ref_metal_leve_sulloy')),
                         ref_anel_kalled: cl(col(r,'REF ANEL KALLED','ref_anel_kalled')),
                         espessura_canaletas: cl(col(r,'ESPESSURA DAS CANALETAS','ESPESSURA CANALETAS','ESPESSURA DE CANALETAS','Espessura das Canaletas','Espessura de Canaletas','Espessura Canaletas','espessura_canaletas')),
+                        anel_kalled: cl(col(r,'ANEL KALLED','Anel Kalled','anel_kalled')),
+                        observacao: cl(col(r,'OBSERVAÇÃO','OBSERVACAO','Observação','Observacao','obs','OBS')),
+                        tipo: cl(col(r,'TIPO','Tipo','tipo')),
                         lancamentos,
                         updated_at: new Date().toISOString()
                     };
@@ -845,7 +864,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 catalogoCount = await insertBatch('catalogo_produtos', catRows as any[]);
             }
 
-            return res.json({ success: true, counts: { representantes: repsCount, clientes: cliCount, produtos: prodCount, vendas: vendasCount, vendas_representantes: vrCount, visitas: visitasCount, catalogo: catalogoCount } });
+                await supabase.from('api_sync_status').update({
+                    status: 'Concluído',
+                    last_sync: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }).eq('id', '00000000-0000-0000-0000-000000000001');
+
+                return res.json({ success: true, counts: { representantes: repsCount, clientes: cliCount, produtos: prodCount, vendas: vendasCount, vendas_representantes: vrCount, visitas: visitasCount, catalogo: catalogoCount } });
+            } catch (syncError: any) {
+                await supabase.from('api_sync_status').update({
+                    status: 'Erro',
+                    error_message: syncError.message,
+                    updated_at: new Date().toISOString()
+                }).eq('id', '00000000-0000-0000-0000-000000000001');
+                throw syncError;
+            }
         }
 
         return res.status(404).json({ error: 'Rota não encontrada' });
