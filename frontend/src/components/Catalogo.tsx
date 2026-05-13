@@ -385,6 +385,16 @@ export default function Catalogo() {
         } catch { setError('Erro ao consultar o catálogo. Verifique sua conexão.'); }
         finally { setLoading(false); setSearched(true); }
     }
+    async function handleSearchLancamentos() {
+        setFilters({ ...EMPTY, lancamentos: true });
+        setLoading(true); setError('');
+        try {
+            const { data, error: err } = await supabase.from('catalogo_produtos').select('*').eq('lancamentos', true).order('cod').limit(5000);
+            if (err) throw err;
+            setResults(data || []);
+        } catch { setError('Erro ao consultar o catálogo. Verifique sua conexão.'); }
+        finally { setLoading(false); setSearched(true); }
+    }
 
     function handleClear() { setFilters(EMPTY); setResults([]); setSearched(false); setError(''); }
     const set = (k: keyof Filters, v: string) => setFilters((p: Filters) => ({ ...p, [k]: v }));
@@ -703,19 +713,15 @@ export default function Catalogo() {
                             </div>
                             <div className="flex items-end">
                                 <button type="button"
-                                    onClick={() => setFilters((p: Filters) => ({ ...p, lancamentos: !p.lancamentos }))}
-                                    className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg border-2 text-base font-semibold transition-all ${
-                                        filters.lancamentos
-                                            ? 'border-green-500 bg-green-500/10 text-green-600'
-                                            : `${dark ? 'border-[#444] text-[#888]' : 'border-[#ccc] text-[#888]'}`
+                                    disabled={loading || !catalogoConfigured}
+                                    onClick={handleSearchLancamentos}
+                                    className={`flex items-center justify-center gap-2 w-full px-4 py-3 rounded-lg border-2 text-base font-semibold transition-all active:scale-95 disabled:opacity-50 ${
+                                        dark 
+                                            ? 'border-green-500/50 bg-green-500/10 text-green-500 hover:bg-green-500/20' 
+                                            : 'border-green-500 bg-green-50 text-green-600 hover:bg-green-100'
                                     }`}>
-                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                                        filters.lancamentos ? 'bg-green-500 border-green-500' : dark ? 'border-[#555]' : 'border-[#bbb]'
-                                    }`}>
-                                        {filters.lancamentos && <span className="text-white text-xs font-black">✓</span>}
-                                    </div>
-                                    <Sparkles className={`w-4 h-4 flex-shrink-0 ${filters.lancamentos ? 'text-green-500' : ''}`} />
-                                    Apenas Lançamentos
+                                    <Sparkles className="w-5 h-5 flex-shrink-0" />
+                                    Ver Lançamentos
                                 </button>
                             </div>
                         </div>
