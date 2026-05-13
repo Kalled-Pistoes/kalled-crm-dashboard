@@ -49,7 +49,7 @@ export default function LoginPage() {
                         <img
                             src="/Kalled%20White.png"
                             alt="Kalled Pistões"
-                            className="h-14 object-contain"
+                            className="h-40 object-contain"
                             onError={e => {
                                 e.currentTarget.style.display = 'none';
                                 const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
