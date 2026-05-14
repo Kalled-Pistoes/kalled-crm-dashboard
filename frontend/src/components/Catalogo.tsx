@@ -66,7 +66,8 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
     const [expanded, setExpanded] = useState(false);
     const [imgError, setImgError] = useState(false);
     const hasExtras = !!(p.diametro_cilindro || p.sobremedida || p.qtd_pistoes || p.espessura_canaletas || p.pa || p.anel_kalled || p.ref_metal_leve_sulloy || p.ref_anel_kalled);
-    const imageUrl = `/Imagens/${encodeURIComponent(p.cod)}.png`;
+    const STORAGE_URL = 'https://fkgketldtuvwlhbhhaav.supabase.co/storage/v1/object/public/produtos-imagens';
+    const imageUrl = `${STORAGE_URL}/${encodeURIComponent(p.cod)}.png`;
 
     // Divide veículos e anos separados por '/' e cruza cada par (veiculo[i] <-> ano[i])
     const veiculosList = p.veiculo
@@ -321,7 +322,8 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
 // ── ModalImage — gerencia o fallback de imagem no modal ──────────────────
 function ModalImage({ product, dark }: { product: CatalogoProduto; dark: boolean }) {
     const [imgError, setImgError] = useState(false);
-    const imageUrl = `/Imagens/${encodeURIComponent(product.cod)}.png`;
+    const STORAGE_URL = 'https://fkgketldtuvwlhbhhaav.supabase.co/storage/v1/object/public/produtos-imagens';
+    const imageUrl = `${STORAGE_URL}/${encodeURIComponent(product.cod)}.png`;
     if (imgError) return <Package className={`w-32 h-32 ${dark ? 'text-[#444]' : 'text-[#ccc]'}`} />;
     return (
         <img
