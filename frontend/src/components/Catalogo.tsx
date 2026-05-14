@@ -64,7 +64,9 @@ interface ProdutoCardProps {
 
 function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
     const [expanded, setExpanded] = useState(false);
+    const [imgError, setImgError] = useState(false);
     const hasExtras = !!(p.diametro_cilindro || p.sobremedida || p.qtd_pistoes || p.espessura_canaletas || p.pa || p.anel_kalled || p.ref_metal_leve_sulloy || p.ref_anel_kalled);
+    const imageUrl = `/Imagens/${p.cod}.png`;
 
     // Divide veículos e anos separados por '/' e cruza cada par (veiculo[i] <-> ano[i])
     const veiculosList = p.veiculo
@@ -139,8 +141,13 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
                     className={`flex-shrink-0 w-24 h-24 rounded-lg flex items-center justify-center border overflow-hidden cursor-pointer hover:opacity-80 transition-opacity ${
                     dark ? 'bg-[#1a1a1e] border-[#333]' : 'bg-[#f5f5f5] border-[#e0e0e0]'
                 }`}>
-                    {p.image_url ? (
-                        <img src={p.image_url} alt={p.cod} className="w-full h-full object-cover" />
+                    {!imgError ? (
+                        <img
+                            src={imageUrl}
+                            alt={p.cod}
+                            className="w-full h-full object-cover"
+                            onError={() => setImgError(true)}
+                        />
                     ) : (
                         <Package className={`w-10 h-10 ${dark ? 'text-[#444]' : 'text-[#ccc]'}`} />
                     )}
@@ -308,6 +315,21 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
                 )}
             </div>
         </div>
+    );
+}
+
+// ── ModalImage — gerencia o fallback de imagem no modal ──────────────────
+function ModalImage({ product, dark }: { product: CatalogoProduto; dark: boolean }) {
+    const [imgError, setImgError] = useState(false);
+    const imageUrl = `/Imagens/${product.cod}.png`;
+    if (imgError) return <Package className={`w-32 h-32 ${dark ? 'text-[#444]' : 'text-[#ccc]'}`} />;
+    return (
+        <img
+            src={imageUrl}
+            alt={product.cod}
+            className="max-w-full max-h-full object-contain"
+            onError={() => setImgError(true)}
+        />
     );
 }
 
@@ -837,11 +859,7 @@ export default function Catalogo() {
                         
                         <div className={`p-6 rounded-2xl ${dark ? 'bg-[#232328]' : 'bg-white'} shadow-2xl overflow-hidden border ${dark ? 'border-[#333]' : 'border-zinc-200'}`}>
                             <div className={`aspect-square w-full max-w-[500px] flex items-center justify-center rounded-xl border overflow-hidden ${dark ? 'bg-[#1a1a1e] border-[#333]' : 'bg-[#f5f5f5] border-[#e0e0e0]'}`}>
-                                {selectedProduct.image_url ? (
-                                    <img src={selectedProduct.image_url} alt={selectedProduct.cod} className="max-w-full max-h-full object-contain" />
-                                ) : (
-                                    <Package className={`w-32 h-32 ${dark ? 'text-[#444]' : 'text-[#ccc]'}`} />
-                                )}
+                                <ModalImage product={selectedProduct} dark={dark} />
                             </div>
                             
                             <div className="mt-6 text-center">
