@@ -67,7 +67,12 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
     const [imgError, setImgError] = useState(false);
     const hasExtras = !!(p.diametro_cilindro || p.sobremedida || p.qtd_pistoes || p.espessura_canaletas || p.pa || p.anel_kalled || p.ref_metal_leve_sulloy || p.ref_anel_kalled);
     const STORAGE_URL = 'https://fkgketldtuvwlhbhhaav.supabase.co/storage/v1/object/public/produtos-imagens';
-    const imageUrl = `${STORAGE_URL}/${encodeURIComponent(p.cod)}.png`;
+    
+    // Normaliza o código para o padrão do Storage: Se começa com P e não tem espaço, adiciona (ex: P2000 -> P 2000)
+    const normalizedCod = (p.cod.startsWith('P') && !p.cod.includes(' ')) 
+        ? `P ${p.cod.substring(1)}` 
+        : p.cod;
+    const imageUrl = `${STORAGE_URL}/${encodeURIComponent(normalizedCod)}.png`;
 
     // Divide veículos e anos separados por '/' e cruza cada par (veiculo[i] <-> ano[i])
     const veiculosList = p.veiculo
@@ -323,7 +328,12 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
 function ModalImage({ product, dark }: { product: CatalogoProduto; dark: boolean }) {
     const [imgError, setImgError] = useState(false);
     const STORAGE_URL = 'https://fkgketldtuvwlhbhhaav.supabase.co/storage/v1/object/public/produtos-imagens';
-    const imageUrl = `${STORAGE_URL}/${encodeURIComponent(product.cod)}.png`;
+    
+    // Normaliza o código para o padrão do Storage (mesma lógica do card)
+    const normalizedCod = (product.cod.startsWith('P') && !product.cod.includes(' ')) 
+        ? `P ${product.cod.substring(1)}` 
+        : product.cod;
+    const imageUrl = `${STORAGE_URL}/${encodeURIComponent(normalizedCod)}.png`;
     if (imgError) return <Package className={`w-32 h-32 ${dark ? 'text-[#444]' : 'text-[#ccc]'}`} />;
     return (
         <img
