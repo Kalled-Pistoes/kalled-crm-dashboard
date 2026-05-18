@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { 
     Search, CheckCircle2, Calendar, PlayCircle, XCircle, AlertCircle, HelpCircle, 
     ChevronRight, ArrowLeft, Building, User, DollarSign, Target, Briefcase, TrendingUp 
 } from 'lucide-react';
-import { api, Visita, formatCurrency, formatDate, Filters } from '../lib/api';
+import { api, Visita, formatDate } from '../lib/api';
+
 
 const STATUS_CONFIG: Record<string, { 
     label: string; 
@@ -54,8 +55,8 @@ function getStatusStyle(status: string) {
 }
 
 export default function Visitas() {
-    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+
     const [visitas, setVisitas] = useState<Visita[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -64,19 +65,14 @@ export default function Visitas() {
     const [filtroTipo, setFiltroTipo] = useState('');
     const [selectedVisita, setSelectedVisita] = useState<Visita | null>(null);
 
-    const filters: Filters = {
-        ano: searchParams.get('ano') || String(new Date().getFullYear()),
-        mes: searchParams.get('mes') || undefined,
-        linha: searchParams.get('linha') || undefined,
-    };
 
     useEffect(() => {
         setLoading(true);
-        api.getVisitas(filters)
+        api.getVisitas()
             .then(setVisitas)
             .catch(e => setError(e.message))
             .finally(() => setLoading(false));
-    }, [searchParams]);
+    }, []);
 
     const representantes = useMemo(() => {
         const set = new Set(visitas.map(v => v.representante).filter(Boolean));
@@ -98,7 +94,7 @@ export default function Visitas() {
         });
     }, [visitas, search, filtroRep, filtroTipo]);
 
-    const custoTotal = useMemo(() => filtered.reduce((acc, v) => acc + v.custo, 0), [filtered]);
+
 
     // Auto-seleciona a primeira visita no desktop quando os dados carregam ou mudam de filtro
     useEffect(() => {
@@ -137,10 +133,6 @@ export default function Visitas() {
                     <p className="text-slate-500 text-sm mt-1 font-medium">{visitas.length.toLocaleString('pt-BR')} visitas registradas</p>
                 </div>
                 <div className="flex gap-3">
-                    <div className="card-premium py-2 sm:py-3 px-4 sm:px-5 border-amber-500/20 shadow-amber-500/5">
-                        <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Custo Filtrado</p>
-                        <p className="text-base sm:text-lg font-bold text-amber-400">{formatCurrency(custoTotal)}</p>
-                    </div>
                     <div className="card-premium py-2 sm:py-3 px-4 sm:px-5 border-[#C01717]/20 shadow-none">
                         <p className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Visitas</p>
                         <p className="text-base sm:text-lg font-bold text-[#e05050]">{filtered.length.toLocaleString('pt-BR')}</p>

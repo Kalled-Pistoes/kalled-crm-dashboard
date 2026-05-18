@@ -509,8 +509,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!user) return;
             const repId = await getRepresentanteId(user);
             let q: any = supabase.from('visitas_tecnicas')
-                .select('id, data, tipo_visita, responsavel_visita, status, objetivos_metas, potencial_compra, custo_visita, representante:representante_id(nome), cliente:cliente_id(nome)');
-            q = applyDateFilter(q, req.query as any);
+                .select('id, data, tipo_visita, responsavel_visita, status, objetivos_metas, potencial_compra, custo_visita, cliente_nome, representante:representante_id(nome), cliente:cliente_id(nome)');
             if (repId) q = q.eq('representante_id', repId);
             const { data, error } = await q.order('data', { ascending: false }).limit(10000);
             if (error) return res.status(500).json({ error: error.message });
@@ -520,7 +519,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 tipoVisita: r.tipo_visita || '',
                 responsavelVisita: r.responsavel_visita || '',
                 representante: r.representante?.nome ?? '', 
-                cliente: r.cliente?.nome ?? '',
+                cliente: r.cliente?.nome ?? r.cliente_nome ?? '',
                 status: r.status || '',
                 objetivosMetas: r.objetivos_metas || '',
                 potencialCompra: r.potencial_compra || 0,
