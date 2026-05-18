@@ -103,11 +103,7 @@ export default function Visitas() {
     // Auto-seleciona a primeira visita no desktop quando os dados carregam ou mudam de filtro
     useEffect(() => {
         if (filtered.length > 0) {
-            const exists = filtered.some(v => 
-                v.cliente === selectedVisita?.cliente && 
-                v.data === selectedVisita?.data && 
-                v.representante === selectedVisita?.representante
-            );
+            const exists = filtered.some(v => v.id === selectedVisita?.id);
             if (!exists) {
                 if (window.innerWidth >= 768) {
                     setSelectedVisita(filtered[0]);
@@ -207,16 +203,13 @@ export default function Visitas() {
                             </div>
                         ) : (
                             filtered.slice(0, 300).map((v, i) => {
-                                const isSelected = selectedVisita && 
-                                    selectedVisita.cliente === v.cliente && 
-                                    selectedVisita.data === v.data && 
-                                    selectedVisita.representante === v.representante;
+                                const isSelected = selectedVisita?.id === v.id;
                                 const style = getStatusStyle(v.status);
                                 const StatusIcon = style.icon;
                                 
                                 return (
                                     <button
-                                        key={i}
+                                        key={v.id}
                                         id={`visit-item-${i}`}
                                         onClick={() => setSelectedVisita(v)}
                                         className={`w-full text-left p-4 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col gap-2 group relative overflow-hidden focus:outline-none focus:ring-1 focus:ring-[#C01717]/40 ${

@@ -509,12 +509,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!user) return;
             const repId = await getRepresentanteId(user);
             let q: any = supabase.from('visitas_tecnicas')
-                .select('data, tipo_visita, responsavel_visita, status, objetivos_metas, potencial_compra, custo_visita, representante:representante_id(nome), cliente:cliente_id(nome)');
+                .select('id, data, tipo_visita, responsavel_visita, status, objetivos_metas, potencial_compra, custo_visita, representante:representante_id(nome), cliente:cliente_id(nome)');
             q = applyDateFilter(q, req.query as any);
             if (repId) q = q.eq('representante_id', repId);
             const { data, error } = await q.order('data', { ascending: false }).limit(10000);
             if (error) return res.status(500).json({ error: error.message });
             return res.json((data || []).map((r: any) => ({
+                id: r.id,
                 data: r.data, 
                 tipoVisita: r.tipo_visita || '',
                 responsavelVisita: r.responsavel_visita || '',

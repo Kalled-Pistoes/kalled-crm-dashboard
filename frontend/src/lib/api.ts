@@ -117,6 +117,7 @@ export interface ItensNaoComprados {
 }
 
 export interface Visita {
+    id: string;
     data: string;
     tipoVisita: string;
     responsavelVisita: string;
