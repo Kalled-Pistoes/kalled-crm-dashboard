@@ -4,7 +4,7 @@ import {
     Search, CheckCircle2, Calendar, PlayCircle, XCircle, AlertCircle, HelpCircle, 
     ChevronRight, ArrowLeft, Building, User, DollarSign, Target, Briefcase, TrendingUp 
 } from 'lucide-react';
-import { api, Visita, formatDate } from '../lib/api';
+import { api, Visita, formatCurrency, formatDate } from '../lib/api';
 
 
 const STATUS_CONFIG: Record<string, { 
