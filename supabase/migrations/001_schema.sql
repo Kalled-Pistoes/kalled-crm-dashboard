@@ -64,13 +64,17 @@ CREATE TABLE vendas_representantes (
 
 -- 6. VISITAS TECNICAS
 CREATE TABLE visitas_tecnicas (
-  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  data             DATE        NOT NULL,
-  tipo_visita      TEXT,
-  representante_id UUID        NOT NULL REFERENCES representantes(id) ON DELETE CASCADE,
-  cliente_id       UUID        REFERENCES clientes(id) ON DELETE SET NULL,
-  custo_visita     NUMERIC     DEFAULT 0,
-  created_at       TIMESTAMPTZ DEFAULT now()
+  id                 UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  data               DATE        NOT NULL,
+  tipo_visita        TEXT,
+  responsavel_visita TEXT,
+  representante_id   UUID        NOT NULL REFERENCES representantes(id) ON DELETE CASCADE,
+  cliente_id         UUID        REFERENCES clientes(id) ON DELETE SET NULL,
+  status             TEXT,
+  objetivos_metas    TEXT,
+  potencial_compra   NUMERIC     DEFAULT 0,
+  custo_visita       NUMERIC     DEFAULT 0,
+  created_at         TIMESTAMPTZ DEFAULT now()
 );
 
 -- ============================================================

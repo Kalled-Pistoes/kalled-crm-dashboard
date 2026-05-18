@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, Lock, Package, AlertCircle, Sun, Moon, Sparkles, User, Mail, Phone, MapPin } from 'lucide-react';
+import { Search, X, Lock, Package, AlertCircle, Sun, Moon, Sparkles, User, Mail, Phone, MapPin, FileText } from 'lucide-react';
 import { supabase, catalogoConfigured, type CatalogoProduto } from '../lib/supabase';
 
 interface Filters {
@@ -360,7 +360,7 @@ export default function Catalogo() {
 
     const [visitorModal, setVisitorModal] = useState(false);
     const [isReturning, setIsReturning] = useState(false);
-    const [visitorData, setVisitorData] = useState({ nome: '', email: '', telefone: '', estado: '' });
+    const [visitorData, setVisitorData] = useState({ nome: '', email: '', telefone: '', estado: '', cnpj: '' });
     const [savingVisitor, setSavingVisitor] = useState(false);
 
     const [showImageModal, setShowImageModal] = useState(false);
@@ -441,11 +441,27 @@ export default function Catalogo() {
         setVisitorData(p => ({ ...p, telefone: v }));
     };
 
+    const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.length > 14) v = v.slice(0, 14);
+        if (v.length > 12) {
+            v = `${v.slice(0, 2)}.${v.slice(2, 5)}.${v.slice(5, 8)}/${v.slice(8, 12)}-${v.slice(12)}`;
+        } else if (v.length > 8) {
+            v = `${v.slice(0, 2)}.${v.slice(2, 5)}.${v.slice(5, 8)}/${v.slice(8)}`;
+        } else if (v.length > 5) {
+            v = `${v.slice(0, 2)}.${v.slice(2, 5)}.${v.slice(5)}`;
+        } else if (v.length > 2) {
+            v = `${v.slice(0, 2)}.${v.slice(2)}`;
+        }
+        setVisitorData(p => ({ ...p, cnpj: v }));
+    };
+
     async function handleVisitorSubmit(e: FormEvent) {
         e.preventDefault();
         setSavingVisitor(true);
         try {
             const phoneClean = visitorData.telefone.replace(/\D/g, '');
+            const cnpjClean = visitorData.cnpj ? visitorData.cnpj.replace(/\D/g, '') : null;
             
             if (isReturning) {
                 const { data, error: err } = await supabase.from('visitantes_catalogo')
@@ -465,7 +481,8 @@ export default function Catalogo() {
 
             const { data, error: err } = await supabase.from('visitantes_catalogo').insert([{
                 ...visitorData,
-                telefone: phoneClean
+                telefone: phoneClean,
+                cnpj: cnpjClean || null
             }]).select().single();
             
             if (err) {
@@ -553,19 +570,31 @@ export default function Catalogo() {
                             </div>
 
                             {!isReturning && (
-                                <div>
-                                    <label className={`block mb-1.5 ${t.label(dark)}`}>Estado</label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                            <MapPin className={`w-5 h-5 ${t.muted(dark)}`} />
+                                <>
+                                    <div>
+                                        <label className={`block mb-1.5 ${t.label(dark)}`}>Estado</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <MapPin className={`w-5 h-5 ${t.muted(dark)}`} />
+                                            </div>
+                                            <select required value={visitorData.estado} onChange={e => setVisitorData(p => ({ ...p, estado: e.target.value }))}
+                                                className={`${inputCls} pl-10 appearance-none`} style={{ backgroundColor: selectBg }}>
+                                                <option value="">Selecione...</option>
+                                                {ESTADOS.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+                                            </select>
                                         </div>
-                                        <select required value={visitorData.estado} onChange={e => setVisitorData(p => ({ ...p, estado: e.target.value }))}
-                                            className={`${inputCls} pl-10 appearance-none`} style={{ backgroundColor: selectBg }}>
-                                            <option value="">Selecione...</option>
-                                            {ESTADOS.map(uf => <option key={uf} value={uf}>{uf}</option>)}
-                                        </select>
                                     </div>
-                                </div>
+                                    <div>
+                                        <label className={`block mb-1.5 ${t.label(dark)}`}>CNPJ (Opcional)</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                <FileText className={`w-5 h-5 ${t.muted(dark)}`} />
+                                            </div>
+                                            <input type="text" value={visitorData.cnpj} onChange={handleCnpjChange}
+                                                placeholder="00.000.000/0000-00" className={`${inputCls} pl-10`} />
+                                        </div>
+                                    </div>
+                                </>
                             )}
 
                             <button

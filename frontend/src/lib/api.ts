@@ -119,8 +119,12 @@ export interface ItensNaoComprados {
 export interface Visita {
     data: string;
     tipoVisita: string;
+    responsavelVisita: string;
     representante: string;
     cliente: string;
+    status: string;
+    objetivosMetas: string;
+    potencialCompra: number;
     custo: number;
 }
 

@@ -9,6 +9,7 @@ CREATE TABLE visitantes_catalogo (
   email      TEXT        NOT NULL,
   telefone   TEXT        NOT NULL UNIQUE,
   estado     TEXT        NOT NULL,
+  cnpj       TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
