@@ -63,6 +63,8 @@ export default function Visitas() {
     const [search, setSearch] = useState('');
     const [filtroRep, setFiltroRep] = useState('');
     const [filtroTipo, setFiltroTipo] = useState('');
+    const [dataInicio, setDataInicio] = useState('');
+    const [dataFim, setDataFim] = useState('');
     const [selectedVisita, setSelectedVisita] = useState<Visita | null>(null);
 
 
@@ -90,9 +92,11 @@ export default function Visitas() {
             const matchSearch = !q || v.cliente.toLowerCase().includes(q) || v.representante.toLowerCase().includes(q);
             const matchRep = !filtroRep || v.representante === filtroRep;
             const matchTipo = !filtroTipo || v.tipoVisita === filtroTipo;
-            return matchSearch && matchRep && matchTipo;
+            const matchInicio = !dataInicio || v.data >= dataInicio;
+            const matchFim = !dataFim || v.data <= dataFim;
+            return matchSearch && matchRep && matchTipo && matchInicio && matchFim;
         });
-    }, [visitas, search, filtroRep, filtroTipo]);
+    }, [visitas, search, filtroRep, filtroTipo, dataInicio, dataFim]);
 
 
 
@@ -170,6 +174,35 @@ export default function Visitas() {
                     <option value="" className="bg-[#111113]">Todos os tipos</option>
                     {tipos.map(t => <option key={t} value={t} className="bg-[#111113]">{t}</option>)}
                 </select>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3 bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 backdrop-blur-md">
+                    <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-slate-500" />
+                        <input
+                            id="input-data-inicio"
+                            type="date"
+                            className="bg-transparent border-none text-slate-200 text-sm focus:outline-none focus:ring-0 w-auto cursor-pointer"
+                            value={dataInicio}
+                            onChange={e => setDataInicio(e.target.value)}
+                        />
+                    </div>
+                    <span className="text-slate-600 text-xs font-bold uppercase">até</span>
+                    <input
+                        id="input-data-fim"
+                        type="date"
+                        className="bg-transparent border-none text-slate-200 text-sm focus:outline-none focus:ring-0 w-auto cursor-pointer"
+                        value={dataFim}
+                        onChange={e => setDataFim(e.target.value)}
+                    />
+                </div>
+                {(search || filtroRep || filtroTipo || dataInicio || dataFim) && (
+                    <button
+                        id="btn-limpar-filtros"
+                        className="bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+                        onClick={() => { setSearch(''); setFiltroRep(''); setFiltroTipo(''); setDataInicio(''); setDataFim(''); }}
+                    >
+                        Limpar filtros
+                    </button>
+                )}
             </div>
 
             {/* Split Layout Container */}

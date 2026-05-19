@@ -799,6 +799,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     responsavel_visita: String(getVal(r,'Responsável Pela Visita','Reponsável Pela Visita','responsável pela visita')||'').trim()||null,
                     representante_id: repMap.get(rep)||null, 
                     cliente_id: findCliId(cliente), 
+                    cliente_nome: cliente || null,
                     status: String(getVal(r,'Status','status')||'').trim()||null,
                     objetivos_metas: String(getVal(r,'Objetivos e Metas','Obetivos e Metas','objetivos e metas')||'').trim()||null,
                     potencial_compra: parseCurrency(getVal(r,'Potencial Mensal de Compra','potencial mensal de compra'))||0,
