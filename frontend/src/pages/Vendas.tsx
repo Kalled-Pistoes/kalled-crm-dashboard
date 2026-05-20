@@ -52,6 +52,14 @@ export default function Vendas() {
     // Controle de Abas
     const [activeTab, setActiveTab] = useState<'transacoes' | 'predict'>('transacoes');
 
+    // Cliente selecionado para a gaveta de detalhes (Distinct Sum)
+    const [selectedClienteNome, setSelectedClienteNome] = useState<string | null>(null);
+
+    // Resetar cliente selecionado quando qualquer filtro de busca ou data muda
+    useEffect(() => {
+        setSelectedClienteNome(null);
+    }, [search, dataInicio, dataFim, valorFilter]);
+
     // Filtros da aba Predict
     const [searchPredict, setSearchPredict] = useState('');
     const [filtroInatividade, setFiltroInatividade] = useState<'all' | 'ativo' | '3m' | '6m' | '9m' | '1a' | '2a+'>('all');
@@ -103,6 +111,35 @@ export default function Vendas() {
     // Faturamento total do filtro atual
     const totalFiltrado = useMemo(() =>
         filteredTransacoes.reduce((acc, v) => acc + v.valor, 0), [filteredTransacoes]);
+
+    // Agregação de vendas por cliente (Distinct Sum)
+    const clientesAgregados = useMemo(() => {
+        const cache: Record<string, { cliente: string; valorTotal: number; transacoesCount: number; ultimaData: string }> = {};
+        
+        filteredTransacoes.forEach(v => {
+            if (!cache[v.cliente]) {
+                cache[v.cliente] = {
+                    cliente: v.cliente,
+                    valorTotal: 0,
+                    transacoesCount: 0,
+                    ultimaData: v.data
+                };
+            }
+            cache[v.cliente].valorTotal += v.valor;
+            cache[v.cliente].transacoesCount += 1;
+            if (v.data > cache[v.cliente].ultimaData) {
+                cache[v.cliente].ultimaData = v.data;
+            }
+        });
+
+        return Object.values(cache).sort((a, b) => b.valorTotal - a.valorTotal);
+    }, [filteredTransacoes]);
+
+    // Transações detalhadas do cliente selecionado dentro dos filtros atuais
+    const transacoesDoClienteSelecionado = useMemo(() => {
+        if (!selectedClienteNome) return [];
+        return filteredTransacoes.filter(v => v.cliente === selectedClienteNome);
+    }, [filteredTransacoes, selectedClienteNome]);
 
     // Estatísticas das faixas financeiras baseadas no lote de vendas atual (para os cards clicáveis)
     const statsFaixas = useMemo(() => {
@@ -389,45 +426,181 @@ export default function Vendas() {
                         )}
                     </div>
 
-                    {/* Tabela de Transações */}
-                    <div className="card-premium p-0 overflow-hidden shadow-2xl border border-white/10">
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="bg-white/5 border-b border-white/10 text-slate-500">
-                                    <tr>
-                                        <th className="text-left text-[10px] font-bold uppercase tracking-wider px-6 py-4">Data</th>
-                                        <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-4">Cliente</th>
-                                        <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-4">Código</th>
-                                        <th className="text-right text-[10px] font-bold uppercase tracking-wider px-4 py-4">Qtd</th>
-                                        <th className="text-right text-[10px] font-bold uppercase tracking-wider px-6 py-4">Valor</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/5">
-                                    {filteredTransacoes.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-medium">Nenhum registro encontrado para a combinação de filtros.</td>
-                                        </tr>
-                                    ) : (
-                                        filteredTransacoes.slice(0, 500).map((v, i) => (
-                                            <tr key={i} className="hover:bg-white/5 transition-colors group">
-                                                <td className="px-6 py-4 text-slate-400 whitespace-nowrap">{formatDate(v.data)}</td>
-                                                <td className="px-4 py-4 text-white font-medium max-w-[280px] truncate group-hover:text-[#f87171] transition-colors">{v.cliente}</td>
-                                                <td className="px-4 py-4 text-slate-500 font-mono text-xs tracking-tighter">{v.codigo}</td>
-                                                <td className="px-4 py-4 text-right text-slate-400">{v.quantidade}</td>
-                                                <td className="px-6 py-4 text-right text-emerald-400 font-bold whitespace-nowrap">{formatCurrency(v.valor)}</td>
+                    {/* Painel Principal de Transações em Duas Colunas (Distinct Sum + Gaveta Lateral) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        {/* Coluna Esquerda: Ranking e Agrupamento por Cliente (Distinct Sum) */}
+                        <div className="lg:col-span-7 space-y-4">
+                            <div className="card-premium p-0 overflow-hidden shadow-2xl border border-white/10">
+                                <div className="p-4 bg-white/5 border-b border-white/10 flex items-center justify-between">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Clientes Ativos no Período</span>
+                                    <span className="bg-white/10 px-2.5 py-0.5 rounded text-[10px] font-bold text-slate-300">
+                                        {clientesAgregados.length} {clientesAgregados.length === 1 ? 'cliente' : 'clientes'}
+                                    </span>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-white/5 border-b border-white/10 text-slate-500">
+                                            <tr>
+                                                <th className="text-left text-[10px] font-bold uppercase tracking-wider px-6 py-4">Cliente</th>
+                                                <th className="text-right text-[10px] font-bold uppercase tracking-wider px-4 py-4">Qtd Itens</th>
+                                                <th className="text-right text-[10px] font-bold uppercase tracking-wider px-6 py-4">Valor Acumulado</th>
                                             </tr>
-                                        ))
-                                    )}
-                                </tbody>
-                            </table>
-                            {filteredTransacoes.length > 500 && (
-                                <div className="px-6 py-4 text-center text-[10px] font-bold text-slate-600 border-t border-white/5 uppercase tracking-[0.2em] bg-white/5">
-                                    Exibindo 500 de {filteredTransacoes.length.toLocaleString('pt-BR')} registros. Refine os filtros para ver mais.
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5">
+                                            {clientesAgregados.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={3} className="px-6 py-12 text-center text-slate-500 font-medium">
+                                                        Nenhum cliente encontrado para os filtros ativos.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                clientesAgregados.map((c, i) => (
+                                                    <tr 
+                                                        key={i} 
+                                                        onClick={() => setSelectedClienteNome(selectedClienteNome === c.cliente ? null : c.cliente)}
+                                                        className={`cursor-pointer transition-colors group ${
+                                                            selectedClienteNome === c.cliente 
+                                                                ? 'bg-[#C01717]/10 hover:bg-[#C01717]/15' 
+                                                                : 'hover:bg-white/5'
+                                                        }`}
+                                                    >
+                                                        <td className="px-6 py-4 whitespace-nowrap">
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-[10px] font-bold text-slate-500 bg-white/5 px-2 py-0.5 rounded border border-white/5">
+                                                                    #{i + 1}
+                                                                </span>
+                                                                <div className="font-bold text-white max-w-[280px] truncate group-hover:text-[#f87171] transition-colors" title={c.cliente}>
+                                                                    {c.cliente}
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-4 text-right text-slate-400 font-medium">
+                                                            {c.transacoesCount} {c.transacoesCount === 1 ? 'pedido' : 'pedidos'}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right text-emerald-400 font-black whitespace-nowrap">
+                                                            {formatCurrency(c.valorTotal)}
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Coluna Direita: Gaveta de Itens Comprados */}
+                        <div className="lg:col-span-5">
+                            {selectedClienteNome ? (
+                                <div className="card-premium border border-[#C01717]/30 bg-black/45 backdrop-blur-md shadow-2xl p-6 space-y-6 animate-in slide-in-from-right-4 duration-300 sticky top-4">
+                                    {/* Cabeçalho da Gaveta */}
+                                    <div className="flex items-start justify-between gap-4 pb-4 border-b border-white/10">
+                                        <div className="space-y-1">
+                                            <span className="text-[9px] font-bold tracking-widest text-[#f87171] uppercase bg-[#C01717]/15 px-2 py-0.5 rounded border border-[#C01717]/25">
+                                                Detalhamento de Compras
+                                            </span>
+                                            <h3 className="text-base font-black text-white leading-tight break-words">
+                                                {selectedClienteNome}
+                                            </h3>
+                                        </div>
+                                        <button 
+                                            onClick={() => setSelectedClienteNome(null)}
+                                            className="text-slate-400 hover:text-white p-1 hover:bg-white/5 rounded-lg transition-all cursor-pointer flex-shrink-0"
+                                            title="Fechar detalhes"
+                                        >
+                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+
+                                    {/* Resumo Rápido */}
+                                    <div className="grid grid-cols-2 gap-4 bg-white/5 p-4 rounded-xl border border-white/5">
+                                        <div>
+                                            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Valor Acumulado</p>
+                                            <p className="text-lg font-black text-emerald-400 mt-0.5">
+                                                {formatCurrency(transacoesDoClienteSelecionado.reduce((acc, t) => acc + t.valor, 0))}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[9px] font-bold uppercase tracking-wider text-slate-500">Total de Peças</p>
+                                            <p className="text-lg font-black text-white mt-0.5">
+                                                {transacoesDoClienteSelecionado.reduce((acc, t) => acc + t.quantidade, 0).toLocaleString('pt-BR')}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Tabela de Itens */}
+                                    <div className="space-y-3">
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Itens Comprados no Período</p>
+                                        <div className="overflow-hidden rounded-xl border border-white/5 bg-white/5 max-h-[350px] overflow-y-auto custom-scrollbar">
+                                            <table className="w-full text-xs">
+                                                <thead className="bg-white/5 border-b border-white/10 text-slate-500 sticky top-0 backdrop-blur-md">
+                                                    <tr>
+                                                        <th className="text-left py-3 px-4 font-bold uppercase tracking-wider">Código (PN)</th>
+                                                        <th className="text-right py-3 px-2 font-bold uppercase tracking-wider">Qtd</th>
+                                                        <th className="text-right py-3 px-4 font-bold uppercase tracking-wider">Subtotal</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/5 text-slate-300">
+                                                    {transacoesDoClienteSelecionado.map((item, index) => (
+                                                        <tr key={index} className="hover:bg-white/5 transition-colors">
+                                                            <td className="py-3 px-4">
+                                                                <div className="font-mono font-bold text-white tracking-tighter">
+                                                                    {item.codigo}
+                                                                </div>
+                                                                <div className="text-[9px] text-slate-500 font-semibold mt-0.5">
+                                                                    Data: {formatDate(item.data)}
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-3 px-2 text-right font-medium">
+                                                                {item.quantidade}
+                                                            </td>
+                                                            <td className="py-3 px-4 text-right text-emerald-400 font-bold whitespace-nowrap">
+                                                                {formatCurrency(item.valor)}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+
+                                    {/* Ação Inteligente de Oportunidades */}
+                                    <div className="pt-2">
+                                        <Link
+                                            to={`/clientes?cliente=${encodeURIComponent(selectedClienteNome)}&tab=itens`}
+                                            className="w-full flex items-center justify-center gap-2 bg-[#C01717] hover:bg-[#a81414] text-white rounded-xl py-3 px-4 text-xs font-bold uppercase tracking-widest transition-all cursor-pointer shadow-lg shadow-[#C01717]/25"
+                                        >
+                                            <span>Identificar Oportunidades</span>
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                            </svg>
+                                        </Link>
+                                        <p className="text-[10px] text-center text-slate-500 mt-2 font-medium">
+                                            Veja a lista de itens que este cliente deixou de comprar.
+                                        </p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="card-premium border border-white/5 bg-white/5 py-16 px-6 text-center flex flex-col items-center justify-center gap-4 sticky top-4">
+                                    <div className="w-12 h-12 bg-white/5 border border-white/10 rounded-full flex items-center justify-center text-slate-500">
+                                        <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                                        </svg>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-bold text-white">Detalhamento de Compras</h4>
+                                        <p className="text-xs text-slate-500 mt-1 max-w-[240px] mx-auto leading-relaxed">
+                                            Selecione um cliente na lista à esquerda para analisar seus itens comprados detalhadamente.
+                                        </p>
+                                    </div>
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
+
             )}
 
             {/* TAB 2: PREDICT COMERCIAL */}
