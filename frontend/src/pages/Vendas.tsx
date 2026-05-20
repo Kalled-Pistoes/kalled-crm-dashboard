@@ -91,32 +91,22 @@ export default function Vendas() {
 
 
 
-    // Filtros aplicados na aba de Transações
-    const filteredTransacoes = useMemo(() => {
+    // Transações filtradas temporariamente por período e busca
+    const transacoesPeriodo = useMemo(() => {
         const q = search.toLowerCase();
         return vendas.filter(v => {
             const matchSearch = !q || v.cliente.toLowerCase().includes(q) || v.codigo.toLowerCase().includes(q);
             const matchInicio = !dataInicio || v.data >= dataInicio;
             const matchFim = !dataFim || v.data <= dataFim;
-            const matchValor =
-                valorFilter === 'all' ? true :
-                valorFilter === 'premium' ? v.valor > 30000 :
-                valorFilter === 'media' ? (v.valor >= 5000 && v.valor <= 30000) :
-                v.valor < 5000;
-
-            return matchSearch && matchInicio && matchFim && matchValor;
+            return matchSearch && matchInicio && matchFim;
         });
-    }, [vendas, search, dataInicio, dataFim, valorFilter]);
+    }, [vendas, search, dataInicio, dataFim]);
 
-    // Faturamento total do filtro atual
-    const totalFiltrado = useMemo(() =>
-        filteredTransacoes.reduce((acc, v) => acc + v.valor, 0), [filteredTransacoes]);
-
-    // Agregação de vendas por cliente (Distinct Sum)
-    const clientesAgregados = useMemo(() => {
+    // Agrupamento completo dos clientes e seus faturamentos acumulados no período ativo (Distinct Sum temporário)
+    const clientesAgregadosPeriodo = useMemo(() => {
         const cache: Record<string, { cliente: string; valorTotal: number; transacoesCount: number; ultimaData: string }> = {};
         
-        filteredTransacoes.forEach(v => {
+        transacoesPeriodo.forEach(v => {
             if (!cache[v.cliente]) {
                 cache[v.cliente] = {
                     cliente: v.cliente,
@@ -132,16 +122,10 @@ export default function Vendas() {
             }
         });
 
-        return Object.values(cache).sort((a, b) => b.valorTotal - a.valorTotal);
-    }, [filteredTransacoes]);
+        return Object.values(cache);
+    }, [transacoesPeriodo]);
 
-    // Transações detalhadas do cliente selecionado dentro dos filtros atuais
-    const transacoesDoClienteSelecionado = useMemo(() => {
-        if (!selectedClienteNome) return [];
-        return filteredTransacoes.filter(v => v.cliente === selectedClienteNome);
-    }, [filteredTransacoes, selectedClienteNome]);
-
-    // Estatísticas das faixas financeiras baseadas no lote de vendas atual (para os cards clicáveis)
+    // Estatísticas das faixas financeiras baseadas no faturamento acumulado por cliente no período selecionado
     const statsFaixas = useMemo(() => {
         let total = 0;
         let countTotal = 0;
@@ -152,17 +136,17 @@ export default function Vendas() {
         let varejo = 0;
         let countVarejo = 0;
 
-        vendas.forEach(v => {
-            total += v.valor;
+        clientesAgregadosPeriodo.forEach(c => {
+            total += c.valorTotal;
             countTotal++;
-            if (v.valor > 30000) {
-                premium += v.valor;
+            if (c.valorTotal > 30000) {
+                premium += c.valorTotal;
                 countPremium++;
-            } else if (v.valor >= 5000) {
-                media += v.valor;
+            } else if (c.valorTotal >= 5000) {
+                media += c.valorTotal;
                 countMedia++;
             } else {
-                varejo += v.valor;
+                varejo += c.valorTotal;
                 countVarejo++;
             }
         });
@@ -173,7 +157,29 @@ export default function Vendas() {
             media, countMedia,
             varejo, countVarejo
         };
-    }, [vendas]);
+    }, [clientesAgregadosPeriodo]);
+
+    // Lista de clientes agregados filtrada pelo filtro de faixa de valor acumulado
+    const clientesAgregados = useMemo(() => {
+        return clientesAgregadosPeriodo
+            .filter(c => {
+                if (valorFilter === 'all') return true;
+                if (valorFilter === 'premium') return c.valorTotal > 30000;
+                if (valorFilter === 'media') return c.valorTotal >= 5000 && c.valorTotal <= 30000;
+                return c.valorTotal < 5000;
+            })
+            .sort((a, b) => b.valorTotal - a.valorTotal);
+    }, [clientesAgregadosPeriodo, valorFilter]);
+
+    // Transações detalhadas do cliente selecionado no período correspondente
+    const transacoesDoClienteSelecionado = useMemo(() => {
+        if (!selectedClienteNome) return [];
+        return transacoesPeriodo.filter(v => v.cliente === selectedClienteNome);
+    }, [transacoesPeriodo, selectedClienteNome]);
+
+    // Faturamento total somando apenas os clientes que atendem ao filtro ativo
+    const totalFiltrado = useMemo(() =>
+        clientesAgregados.reduce((acc, c) => acc + c.valorTotal, 0), [clientesAgregados]);
 
     // Processamento do Predict Comercial com base no histórico completo
     const clientesPredict = useMemo(() => {
@@ -331,7 +337,7 @@ export default function Vendas() {
                                 <Filter className={`w-3.5 h-3.5 ${valorFilter === 'all' ? 'text-white' : 'text-slate-600'}`} />
                             </div>
                             <p className="text-xl font-black text-white">{formatCurrency(totalFiltrado)}</p>
-                            <p className="text-xs text-slate-500 mt-1 font-medium">{filteredTransacoes.length} transações filtradas</p>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">{clientesAgregados.length} {clientesAgregados.length === 1 ? 'cliente listado' : 'clientes listados'}</p>
                         </div>
 
                         {/* Vendas Premium (> 30k) */}
@@ -348,7 +354,7 @@ export default function Vendas() {
                                 <TrendingUp className={`w-3.5 h-3.5 ${valorFilter === 'premium' ? 'text-emerald-400' : 'text-slate-600'}`} />
                             </div>
                             <p className="text-xl font-black text-emerald-400">{formatCurrency(statsFaixas.premium)}</p>
-                            <p className="text-xs text-slate-500 mt-1 font-medium">{statsFaixas.countPremium} vendas de grande porte</p>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">{statsFaixas.countPremium} {statsFaixas.countPremium === 1 ? 'cliente premium' : 'clientes premium'}</p>
                         </div>
 
                         {/* Vendas Médias (5k - 30k) */}
@@ -365,7 +371,7 @@ export default function Vendas() {
                                 <Clock className={`w-3.5 h-3.5 ${valorFilter === 'media' ? 'text-amber-400' : 'text-slate-600'}`} />
                             </div>
                             <p className="text-xl font-black text-amber-400">{formatCurrency(statsFaixas.media)}</p>
-                            <p className="text-xs text-slate-500 mt-1 font-medium">{statsFaixas.countMedia} vendas recorrentes</p>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">{statsFaixas.countMedia} {statsFaixas.countMedia === 1 ? 'cliente recorrente' : 'clientes recorrentes'}</p>
                         </div>
 
                         {/* Vendas Recorrentes / Varejo (< 5k) */}
@@ -382,7 +388,7 @@ export default function Vendas() {
                                 <UserCheck className={`w-3.5 h-3.5 ${valorFilter === 'varejo' ? 'text-rose-400' : 'text-slate-600'}`} />
                             </div>
                             <p className="text-xl font-black text-rose-400">{formatCurrency(statsFaixas.varejo)}</p>
-                            <p className="text-xs text-slate-500 mt-1 font-medium">{statsFaixas.countVarejo} transações fracionadas</p>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">{statsFaixas.countVarejo} {statsFaixas.countVarejo === 1 ? 'cliente fracionado' : 'clientes fracionados'}</p>
                         </div>
                     </div>
 
