@@ -357,7 +357,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!cli) return res.json({ totalItens: 0, totalComprados: 0, naoComprados: [] });
             const vendas = await fetchAllPages(supabase.from('vendas').select('produto:produto_id(pn)').eq('cliente_id', cli.id));
             const skusComprados = new Set(vendas.map((v: any) => v.produto?.pn).filter(Boolean));
-            const { data: produtos, error } = await supabase.from('produtos').select('pn, descricao, linhas, ref_metal_leve, ref_sulloy, ref_ks, ref_apex');
+            const { data: produtos, error } = await supabase.from('produtos').select('pn, descricao, linhas, ref_metal_leve, ref_sulloy, ref_ks, ref_apex, ref_sintech');
             if (error) return res.status(500).json({ error: error.message });
             const naoComprados = (produtos || []).filter(p => !skusComprados.has(p.pn)).map(p => {
                 const refs: Record<string, string> = {};
@@ -365,6 +365,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 if (p.ref_sulloy)     refs['Sulloy']     = p.ref_sulloy;
                 if (p.ref_ks)         refs['KS']         = p.ref_ks;
                 if (p.ref_apex)       refs['Apex']       = p.ref_apex;
+                if (p.ref_sintech)    refs['Sintech']    = p.ref_sintech;
                 return { pn: p.pn, descricao: p.descricao || '', linhas: p.linhas || [], refs };
             });
             return res.json({ totalItens: (produtos || []).length, totalComprados: skusComprados.size, naoComprados });
@@ -742,9 +743,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const pn = String(getVal(r,'PN','pn')||'').trim();
                 if (!pn) return null;
                 const toRef = (v:any) => v && String(v).trim()!=='N/A' && String(v).trim()!=='' ? String(v).trim() : null;
-                const rl = toRef(getVal(r,'Metal Leve')), rs = toRef(getVal(r,'Sulloy')), rk = toRef(getVal(r,'KS')), ra = toRef(getVal(r,'Apex'));
-                const linhas = [...(rl?['Metal Leve']:[]), ...(rs?['Sulloy']:[]), ...(rk?['KS']:[]), ...(ra?['Apex']:[])];
-                return { pn, descricao: String(getVal(r,'Descrição','Descricao','descricao')||'').trim()||null, linhas, ref_metal_leve:rl, ref_sulloy:rs, ref_ks:rk, ref_apex:ra };
+                const rl = toRef(getVal(r,'Metal Leve')), rs = toRef(getVal(r,'Sulloy')), rk = toRef(getVal(r,'KS')), ra = toRef(getVal(r,'Apex')), rsin = toRef(getVal(r,'Sintech'));
+                const linhas = [...(rl?['Metal Leve']:[]), ...(rs?['Sulloy']:[]), ...(rk?['KS']:[]), ...(ra?['Apex']:[]), ...(rsin?['Sintech']:[])];
+                return { pn, descricao: String(getVal(r,'Descrição','Descricao','descricao')||'').trim()||null, linhas, ref_metal_leve:rl, ref_sulloy:rs, ref_ks:rk, ref_apex:ra, ref_sintech:rsin };
             }).filter(Boolean);
             prodCount = await upsertBatch('produtos', prodRows as any[], 'pn');
             const { data: prodData } = await supabase.from('produtos').select('id, pn');
