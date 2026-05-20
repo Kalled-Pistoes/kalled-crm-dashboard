@@ -54,7 +54,20 @@ export default function Clientes() {
         if (!param || clientes.length === 0) return;
         const norm = (s: string) => s.toLowerCase().replace(/\s+/g, ' ').trim();
         const found = clientes.find(c => norm(c.Cliente ?? c['Razão Social'] ?? '') === norm(param));
-        if (found) setSelectedCliente(found);
+        if (found) {
+            setSelectedCliente(found);
+            const tabParam = searchParams.get('tab');
+            if (tabParam === 'itens') {
+                setActiveTab('itens');
+                const nome = found.Cliente ?? found['Razão Social'] ?? '';
+                if (nome) {
+                    setLoadingItens(true);
+                    api.getClienteItensNaoComprados(nome)
+                        .then(setItensData)
+                        .finally(() => setLoadingItens(false));
+                }
+            }
+        }
     }, [clientes]);
 
     const [activeTab, setActiveTab] = useState<'info' | 'historico' | 'itens'>('info');
@@ -66,9 +79,12 @@ export default function Clientes() {
     const [searchPN, setSearchPN] = useState('');
 
     useEffect(() => {
-        setActiveTab('info');
+        const tabParam = searchParams.get('tab');
+        if (tabParam !== 'itens') {
+            setActiveTab('info');
+            setItensData(null);
+        }
         setClienteVendas([]);
-        setItensData(null);
         setFiltroLinha('');
         setSearchPN('');
     }, [selectedCliente?.Cliente]);
