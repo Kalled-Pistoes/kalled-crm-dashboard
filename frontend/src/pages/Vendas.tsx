@@ -81,30 +81,7 @@ export default function Vendas() {
         }
     }, [activeTab, historicoVendas.length]);
 
-    // Clientes de Destaque identificados dinamicamente para atalhos rápidos
-    const clientesDestaque = useMemo(() => {
-        const faturamentos: Record<string, number> = {};
-        vendas.forEach(v => {
-            faturamentos[v.cliente] = (faturamentos[v.cliente] || 0) + v.valor;
-        });
-        return Object.entries(faturamentos)
-            .map(([nome, valor]) => ({ nome, valor }))
-            .sort((a, b) => b.valor - a.valor)
-            .slice(0, 5); // top 5 maiores clientes
-    }, [vendas]);
 
-    // Função para aplicar filtro rápido de cliente em destaque
-    const aplicarFiltroDestaque = (cliente: string, especialJan2024 = false) => {
-        setSearch(cliente);
-        setValorFilter('all');
-        if (especialJan2024) {
-            setDataInicio('2024-01-01');
-            setDataFim('2024-01-31');
-        } else {
-            setDataInicio('');
-            setDataFim('');
-        }
-    };
 
     // Filtros aplicados na aba de Transações
     const filteredTransacoes = useMemo(() => {
@@ -372,47 +349,6 @@ export default function Vendas() {
                         </div>
                     </div>
 
-                    {/* Destaques e Atalhos Rápidos (Seção com click rápido para facilitar a filtragem) */}
-                    <div className="card-premium py-3.5 px-5 bg-white/5 border-white/10 flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-2">
-                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest bg-white/5 px-2.5 py-1 rounded-md border border-white/5">Atalhos Dinâmicos:</span>
-                            <div className="flex flex-wrap gap-2">
-                                <button
-                                    onClick={() => aplicarFiltroDestaque('GERAL PARTS', true)}
-                                    className="px-2.5 py-1 text-[10px] font-bold text-amber-300 hover:text-white bg-amber-500/10 hover:bg-amber-500/30 border border-amber-500/20 rounded transition-all cursor-pointer flex items-center gap-1"
-                                    title="Filtrar GERAL PARTS em Janeiro/2024"
-                                >
-                                    <span>Geral Parts (Jan/2024)</span>
-                                </button>
-                                {clientesDestaque.map(c => (
-                                    <button
-                                        key={c.nome}
-                                        onClick={() => aplicarFiltroDestaque(c.nome, false)}
-                                        className="px-2.5 py-1 text-[10px] font-bold text-slate-300 hover:text-white bg-white/5 hover:bg-white/15 border border-white/10 rounded transition-all cursor-pointer truncate max-w-[150px]"
-                                        title={`Filtrar vendas de ${c.nome}`}
-                                    >
-                                        {c.nome.split(' ')[0]}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Atalhos Rápidos de Calendário */}
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => { setDataInicio('2024-01-01'); setDataFim('2024-12-31'); }}
-                                className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-white bg-black/30 hover:bg-white/5 rounded border border-white/5 transition-all cursor-pointer"
-                            >
-                                Ano 2024
-                            </button>
-                            <button
-                                onClick={() => { setDataInicio('2024-01-01'); setDataFim('2024-01-31'); }}
-                                className="px-2.5 py-1 text-[10px] font-bold text-slate-400 hover:text-white bg-black/30 hover:bg-white/5 rounded border border-white/5 transition-all cursor-pointer"
-                            >
-                                Janeiro 2024
-                            </button>
-                        </div>
-                    </div>
 
                     {/* Filtros */}
                     <div className="flex flex-wrap gap-3">
