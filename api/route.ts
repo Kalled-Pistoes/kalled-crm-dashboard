@@ -166,6 +166,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             })));
         }
 
+        // ── vendas/historico (Predict Comercial) ────────────────────────────
+        // Endpoint dedicado ao Predict: carrega TODO o histórico sem limite de linhas.
+        // Usa fetchAllPages para paginar em blocos de 1000 até esgotar os registros.
+        // Retorna apenas data+cliente+valor (sem codigo/quantidade) para economizar payload.
+        if (s0 === 'vendas' && s1 === 'historico') {
+            const user = requireAuth(req, res);
+            if (!user) return;
+            const repId = await getRepresentanteId(user);
+            let q: any = supabase
+                .from('vendas')
+                .select('data, valor, cliente:cliente_id(nome)')
+                .order('data', { ascending: true });
+            if (repId) q = q.eq('representante_id', repId);
+            const data = await fetchAllPages(q);
+            return res.json(data.map((r: any) => ({
+                data: r.data,
+                cliente: r.cliente?.nome ?? '',
+                valor: r.valor || 0,
+            })));
+        }
+
         if (s0 === 'vendas' && s1 === 'recent') {
             const user = requireAuth(req, res);
             if (!user) return;

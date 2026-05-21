@@ -131,13 +131,14 @@ export default function Vendas() {
         }
     }, [searchParams, activeTab]);
 
-    // Carrega o histórico completo de transações apenas ao entrar no Predict pela primeira vez
+    // Carrega o histórico COMPLETO de transações (todos os anos) ao entrar no Predict pela primeira vez.
+    // Usa endpoint dedicado /api/vendas/historico que usa fetchAllPages sem limite de 1000 linhas.
     useEffect(() => {
         if (activeTab === 'predict' && historicoVendas.length === 0) {
             setLoadingPredict(true);
-            api.getVendas({ ano: 'todos', mes: undefined }) // usa ano 'todos' para desativar filtros automáticos do backend
-                .then(setHistoricoVendas)
-                .catch(e => console.error("Erro ao carregar histórico:", e))
+            api.getVendasHistorico()
+                .then(data => setHistoricoVendas(data as Venda[]))
+                .catch(e => console.error("Erro ao carregar histórico completo:", e))
                 .finally(() => setLoadingPredict(false));
         }
     }, [activeTab, historicoVendas.length]);
@@ -376,13 +377,6 @@ export default function Vendas() {
         // Somar forecast total do faturamento (soma das compras reais de Maio + a expectativa estocástica)
         const forecastTotal = clientesCalculados.reduce((acc, c) => acc + c.valorForecast, 0);
 
-        // Construir série histórica mensal consolidada para o gráfico de linhas (últimos 6 meses + forecast)
-        const mesesGrafico: string[] = [];
-        for (let i = -6; i < 0; i++) {
-            mesesGrafico.push(addMonths(mesForecast, i));
-        }
-        mesesGrafico.push(mesForecast);
-
         // Tradução e formatação
         const MESES_ABR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
         const formatMesAno = (mesStr: string): string => {
@@ -392,8 +386,28 @@ export default function Vendas() {
             return `${MESES_ABR[mesIdx]}/${anoCurto}`;
         };
 
-        const historicoGrafico = mesesGrafico.map(mes => {
-            // Soma real acumulado de todas as transações (incluindo as de forecast já reais se houver)
+        // Construir série histórica mensal com range DINÂMICO baseado no histórico real.
+        // Determina o primeiro mês com venda registrada, mostra até 24 meses antes do forecast.
+        const primeiroMesGlobal = historicoVendas.length > 0
+            ? historicoVendas.reduce((min, v) => v.data < min ? v.data : min, historicoVendas[0].data).substring(0, 7)
+            : addMonths(mesForecast, -12);
+
+        // Calcula quantos meses desde o primeiro mês até o mês de forecast
+        const totalMesesHistorico = diffInMonthsCivil(mesForecast, primeiroMesGlobal);
+        // Limita a 24 meses para legibilidade visual, mas usa o histórico completo se for menor
+        const mesesExibir = Math.min(totalMesesHistorico, 24);
+        const inicioGrafico = addMonths(mesForecast, -mesesExibir);
+
+        const mesesGrafico: string[] = [];
+        for (let i = -mesesExibir; i < 0; i++) {
+            mesesGrafico.push(addMonths(mesForecast, i));
+        }
+        mesesGrafico.push(mesForecast);
+        // Garante que o ponto de início seja no mínimo o primeiro mês com dados reais
+        const mesesGraficoFiltrados = mesesGrafico.filter(m => m >= inicioGrafico);
+
+        const historicoGrafico = mesesGraficoFiltrados.map(mes => {
+            // Soma faturamento real acumulado no mês (inclui compras já concretizadas em meses de forecast)
             const real = historicoVendas
                 .filter(v => v.data.startsWith(mes))
                 .reduce((acc, v) => acc + v.valor, 0);
@@ -402,7 +416,7 @@ export default function Vendas() {
             if (mes === mesForecast) {
                 forecast = forecastTotal;
             } else if (mes === ultimoConsolidado) {
-                // Duplica o real consolidado do último mês para ligar a linha pontilhada sem buracos
+                // Conecta a linha pontilhada ao último ponto real consolidado
                 forecast = real;
             }
 

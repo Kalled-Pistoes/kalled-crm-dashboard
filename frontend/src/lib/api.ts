@@ -171,6 +171,8 @@ export const api = {
     getDashboardStats: (filters?: Filters) => fetchJson<DashboardStats>('/api/dashboard/stats', filters as any),
     getVendas: (filters?: Filters) => fetchJson<Venda[]>('/api/vendas', filters as any),
     getVendasRecentes: (filters?: Filters) => fetchJson<Venda[]>('/api/vendas/recent', filters as any),
+    // Endpoint dedicado ao Predict Comercial: carrega TODO o histórico sem limite de linhas
+    getVendasHistorico: () => fetchJson<Pick<Venda, 'data' | 'cliente' | 'valor'>[]>('/api/vendas/historico'),
     getVendasPorMes: (filters?: Filters) => fetchJson<VendasMes[]>('/api/vendas/por-mes', filters as any),
     getVendasPorEstado: (filters?: Filters) => fetchJson<VendasEstado[]>('/api/vendas/por-estado', filters as any),
     getRanking: (filters?: Filters) => fetchJson<RankingVendedor[]>('/api/vendas/ranking', filters as any),
