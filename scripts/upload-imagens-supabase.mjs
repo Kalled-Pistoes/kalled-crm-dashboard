@@ -2,7 +2,7 @@
  * Script de upload de imagens dos produtos para o Supabase Storage
  * 
  * Como usar:
- * 1. Vá em https://supabase.com/dashboard/project/fkgketldtuvwlhbhhaav/settings/api
+ * 1. Vá em https://supabase.com/dashboard/project/fiuqspnmpuvtlhoklfqp/settings/api
  * 2. Copie a "service_role" key (em "Project API Keys")
  * 3. Cole abaixo em SUPABASE_SERVICE_KEY
  * 4. Rode: node scripts/upload-imagens-supabase.mjs
@@ -18,7 +18,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // ──────────────────────────────────────────────
 // CONFIGURAÇÃO — cole a service_role key aqui
 // ──────────────────────────────────────────────
-const SUPABASE_URL = 'https://fkgketldtuvwlhbhhaav.supabase.co';
+const SUPABASE_URL = 'https://fiuqspnmpuvtlhoklfqp.supabase.co';
 const SUPABASE_SERVICE_KEY = 'COLE_AQUI_SUA_SERVICE_ROLE_KEY'; // ← edite isso
 const BUCKET = 'produtos-imagens';
 const IMAGENS_DIR = path.join(__dirname, '..', 'frontend', 'public', 'Imagens');
@@ -30,7 +30,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 async function uploadImagens() {
     if (SUPABASE_SERVICE_KEY === 'COLE_AQUI_SUA_SERVICE_ROLE_KEY') {
         console.error('❌ Erro: substitua COLE_AQUI_SUA_SERVICE_ROLE_KEY pela chave real!');
-        console.error('   Vá em: https://supabase.com/dashboard/project/fkgketldtuvwlhbhhaav/settings/api');
+        console.error('   Vá em: https://supabase.com/dashboard/project/fiuqspnmpuvtlhoklfqp/settings/api');
         process.exit(1);
     }
 
@@ -81,7 +81,7 @@ async function uploadImagens() {
     
     if (sucesso > 0) {
         console.log('\n🔗 URL base para usar no frontend:');
-        console.log(`   https://fkgketldtuvwlhbhhaav.supabase.co/storage/v1/object/public/${BUCKET}/{cod}.png`);
+        console.log(`   https://fiuqspnmpuvtlhoklfqp.supabase.co/storage/v1/object/public/${BUCKET}/{cod}.png`);
     }
 }
 
