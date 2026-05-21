@@ -517,10 +517,10 @@ export default function Catalogo() {
         <div className={`min-h-screen flex flex-col ${t.page(dark)}`} style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
             {visitorModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                    <div className={`${t.card(dark)} w-full max-w-md p-8 shadow-2xl relative overflow-hidden`}>
+                    <div className={`${t.card(dark)} w-full max-w-md p-6 sm:p-8 shadow-2xl relative max-h-[90vh] overflow-y-auto`}>
                         <div className="absolute top-0 left-0 w-full h-1 bg-[#C01717]" />
                         
-                        <div className="text-center mb-8">
+                        <div className="text-center mb-6">
                             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#C01717]/10 mb-4">
                                 <span className="text-4xl font-black text-[#C01717] italic">K</span>
                             </div>
@@ -600,12 +600,12 @@ export default function Catalogo() {
                             <button
                                 type="submit"
                                 disabled={savingVisitor || !catalogoConfigured}
-                                className="w-full mt-6 bg-[#C01717] hover:bg-[#a01212] disabled:opacity-50 text-white font-bold text-base py-3.5 px-4 rounded-lg transition-all active:scale-95 shadow-lg shadow-[#C01717]/20"
+                                className="w-full mt-5 bg-[#C01717] hover:bg-[#a01212] disabled:opacity-50 text-white font-bold text-base py-3 px-4 rounded-lg transition-all active:scale-95 shadow-lg shadow-[#C01717]/20"
                             >
                                 {savingVisitor ? 'Processando...' : (isReturning ? 'Entrar' : 'Acessar Catálogo')}
                             </button>
 
-                            <div className="text-center mt-6">
+                            <div className="text-center mt-4">
                                 <button
                                     type="button"
                                     onClick={() => setIsReturning(!isReturning)}

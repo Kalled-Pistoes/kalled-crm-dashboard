@@ -388,24 +388,34 @@ export default function Clientes() {
                             <div className={`absolute -top-32 -right-32 w-96 h-96 rounded-full blur-3xl opacity-20 pointer-events-none ${selectedCliente.Status?.toLowerCase() === 'ativo' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
 
                             {/* Header */}
-                            <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-4 relative z-10">
-                                <div className="flex items-center gap-2 mb-2">
-                                    <span className={`inline-flex items-center px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide border ${selectedCliente.Status?.toLowerCase() === 'ativo'
-                                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
-                                        : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.2)]'
-                                        }`}>
-                                        {selectedCliente.Status?.toLowerCase() === 'ativo' ? 'Cliente Ativo' : 'Cliente Inativo'}
-                                    </span>
-                                    {selectedCliente.editado_manualmente && (
-                                        <span className="inline-flex items-center px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide border bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse-slow">
-                                            Editado via Front-end
+                            <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-4 relative z-10 flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                                        <span className={`inline-flex items-center px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide border ${selectedCliente.Status?.toLowerCase() === 'ativo'
+                                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
+                                            : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.2)]'
+                                            }`}>
+                                            {selectedCliente.Status?.toLowerCase() === 'ativo' ? 'Cliente Ativo' : 'Cliente Inativo'}
                                         </span>
-                                    )}
+                                        {selectedCliente.editado_manualmente && (
+                                            <span className="inline-flex items-center px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide border bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse-slow">
+                                                Editado via Front-end
+                                            </span>
+                                        )}
+                                    </div>
+                                    <h2 className="text-2xl font-bold text-white mb-1 tracking-tight truncate max-w-full">
+                                        {selectedCliente.Cliente || selectedCliente['Razão Social'] || 'Sem Nome'}
+                                    </h2>
+                                    <p className="text-slate-400 text-sm font-medium truncate max-w-full">Documento Fiscal / Razão Social: {selectedCliente['Razão Social'] || selectedCliente.Cliente}</p>
                                 </div>
-                                <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">
-                                    {selectedCliente.Cliente || selectedCliente['Razão Social'] || 'Sem Nome'}
-                                </h2>
-                                <p className="text-slate-400 text-sm font-medium">Documento Fiscal / Razão Social: {selectedCliente['Razão Social'] || selectedCliente.Cliente}</p>
+                                <div className="flex-shrink-0">
+                                    <button 
+                                        onClick={handleOpenEditModal}
+                                        className="w-full md:w-auto bg-[#C01717]/10 hover:bg-[#C01717]/25 text-[#e05050] hover:text-white border border-[#C01717]/30 hover:border-[#C01717]/55 rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 cursor-pointer shadow-lg shadow-[#C01717]/5 flex items-center justify-center gap-1.5"
+                                    >
+                                        Editar Cadastro
+                                    </button>
+                                </div>
                             </div>
 
                             {/* Tabs */}
@@ -627,18 +637,6 @@ export default function Clientes() {
                                 )}
                             </div>
 
-                            {/* Buttons */}
-                            <div className="px-4 sm:px-8 py-4 border-t border-white/5 flex gap-3 relative z-10">
-                                <button className="btn-primary opacity-50 cursor-not-allowed" disabled>
-                                    Ver Histórico de Pedidos
-                                </button>
-                                <button 
-                                    onClick={handleOpenEditModal}
-                                    className="btn-ghost cursor-pointer hover:bg-white/5 hover:text-white"
-                                >
-                                    Editar Cadastro
-                                </button>
-                            </div>
                         </div>
                     ) : (
                         <div className="card-premium h-full flex flex-col items-center justify-center text-center border border-white/5 bg-transparent shadow-none">
