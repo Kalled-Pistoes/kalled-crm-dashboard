@@ -1,7 +1,7 @@
 import { useState, useEffect, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, X, Lock, Package, AlertCircle, Sun, Moon, Sparkles, User, Mail, Phone, MapPin, FileText } from 'lucide-react';
-import { supabase, catalogoConfigured, type CatalogoProduto } from '../lib/supabase';
+import { supabase, catalogoConfigured, supabaseUrl, type CatalogoProduto } from '../lib/supabase';
 
 interface Filters {
     buscaGeral: string;
@@ -66,7 +66,7 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
     const [expanded, setExpanded] = useState(false);
     const [imgError, setImgError] = useState(false);
     const hasExtras = !!(p.diametro_cilindro || p.sobremedida || p.qtd_pistoes || p.espessura_canaletas || p.pa || p.anel_kalled || p.ref_metal_leve_sulloy || p.ref_anel_kalled);
-    const STORAGE_URL = 'https://fkgketldtuvwlhbhhaav.supabase.co/storage/v1/object/public/produtos-imagens';
+    const STORAGE_URL = supabaseUrl ? `${supabaseUrl}/storage/v1/object/public/produtos-imagens` : '';
     
     // Normaliza o código para o padrão do Storage: Se começa com P e não tem espaço, adiciona (ex: P2000 -> P 2000)
     const normalizedCod = (p.cod.startsWith('P') && !p.cod.includes(' ')) 
@@ -327,7 +327,7 @@ function ProdutoCard({ p, dark, onOpenImage }: ProdutoCardProps) {
 // ── ModalImage — gerencia o fallback de imagem no modal ──────────────────
 function ModalImage({ product, dark }: { product: CatalogoProduto; dark: boolean }) {
     const [imgError, setImgError] = useState(false);
-    const STORAGE_URL = 'https://fkgketldtuvwlhbhhaav.supabase.co/storage/v1/object/public/produtos-imagens';
+    const STORAGE_URL = supabaseUrl ? `${supabaseUrl}/storage/v1/object/public/produtos-imagens` : '';
     
     // Normaliza o código para o padrão do Storage (mesma lógica do card)
     const normalizedCod = (product.cod.startsWith('P') && !product.cod.includes(' ')) 

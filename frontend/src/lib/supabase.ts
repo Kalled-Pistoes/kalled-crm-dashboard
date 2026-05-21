@@ -1,9 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = import.meta.env.VITE_SUPABASE_URL as string;
-const key = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+export const supabaseUrl = (import.meta.env.VITE_SUPABASE_URL as string) || '';
+export const supabaseAnonKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
 
-export const supabase = createClient(url ?? '', key ?? '');
+export const catalogoConfigured = !!(supabaseUrl && supabaseAnonKey);
+
+export const supabase = createClient(
+    supabaseUrl || 'https://placeholder-project.supabase.co',
+    supabaseAnonKey || 'placeholder-key'
+);
 
 export interface CatalogoProduto {
     id: string;
@@ -28,5 +33,4 @@ export interface CatalogoProduto {
     comprimento_total: string | null;
     image_url: string | null;
 }
-
-export const catalogoConfigured = !!(url && key);
+
