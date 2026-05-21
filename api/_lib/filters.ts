@@ -20,6 +20,7 @@ export function applyDateFilter(
     const today = new Date();
     const currentYear = today.getFullYear().toString();
 
+    if (ano === 'todos' || ano === 'all') return q; // desativa filtros de data para histórico completo
     if (!ano && !mes && !defaultCurrentYear) return q; // sem filtro
 
     const yearToUse = ano || currentYear;

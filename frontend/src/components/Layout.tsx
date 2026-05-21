@@ -22,6 +22,7 @@ export default function Layout() {
     const isSyncPage = pathname === '/sync';
     const isVisitasPage = pathname === '/visitas';
     const isUsuariosPage = pathname === '/usuarios';
+    const isVendasPredict = pathname === '/vendas' && searchParams.get('tab') === 'predict';
 
     const currentAno = searchParams.get('ano') || String(new Date().getFullYear());
     const currentMes = searchParams.get('mes') || '';
@@ -157,7 +158,7 @@ export default function Layout() {
             {/* Filter Sub-header */}
             <div className="bg-[#111113]/60 backdrop-blur-sm text-[#f0f0f0] flex-shrink-0 text-xs border-b border-[#2a2a2a] z-10 overflow-x-auto">
                 <div className="flex items-center justify-end px-3 sm:px-6 gap-3 sm:gap-6 py-2 min-w-max sm:min-w-0 sm:w-full">
-                    {!isClientesPage && !isSyncPage && !isVisitasPage && !isUsuariosPage && (
+                    {!isClientesPage && !isSyncPage && !isVisitasPage && !isUsuariosPage && !isVendasPredict && (
                         <>
                             {!isRepresentantesPage && (
                                 <div className="flex items-center gap-2">

@@ -82,7 +82,7 @@ interface ClientePredict {
 }
 
 export default function Vendas() {
-    const [searchParams] = useSearchParams();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [vendas, setVendas] = useState<Venda[]>([]);
     const [historicoVendas, setHistoricoVendas] = useState<Venda[]>([]);
     const [loading, setLoading] = useState(true);
@@ -95,8 +95,13 @@ export default function Vendas() {
     const [dataFim, setDataFim] = useState('');
     const [valorFilter, setValorFilter] = useState<'all' | 'premium' | 'media' | 'varejo'>('all');
     
-    // Controle de Abas
-    const [activeTab, setActiveTab] = useState<'transacoes' | 'predict'>('transacoes');
+    // Controle de Abas sincronizado com a URL (?tab=...)
+    const activeTab = (searchParams.get('tab') as 'transacoes' | 'predict') || 'transacoes';
+    const setActiveTab = (tab: 'transacoes' | 'predict') => {
+        const newParams = new URLSearchParams(searchParams);
+        newParams.set('tab', tab);
+        setSearchParams(newParams);
+    };
 
     // Cliente selecionado para a gaveta de detalhes (Distinct Sum)
     const [selectedClienteNome, setSelectedClienteNome] = useState<string | null>(null);
@@ -115,20 +120,22 @@ export default function Vendas() {
         mes: searchParams.get('mes') || undefined,
     };
 
-    // Carregamento inicial de vendas baseadas na URL (Transações)
+    // Carregamento inicial de vendas baseadas na URL (Transações) - carrega apenas se a aba transações estiver ativa
     useEffect(() => {
-        setLoading(true);
-        api.getVendas(filters)
-            .then(setVendas)
-            .catch(e => setError(e.message))
-            .finally(() => setLoading(false));
-    }, [searchParams]);
+        if (activeTab === 'transacoes') {
+            setLoading(true);
+            api.getVendas(filters)
+                .then(setVendas)
+                .catch(e => setError(e.message))
+                .finally(() => setLoading(false));
+        }
+    }, [searchParams, activeTab]);
 
     // Carrega o histórico completo de transações apenas ao entrar no Predict pela primeira vez
     useEffect(() => {
         if (activeTab === 'predict' && historicoVendas.length === 0) {
             setLoadingPredict(true);
-            api.getVendas({ ano: undefined, mes: undefined }) // sem filtros para trazer o histórico total
+            api.getVendas({ ano: 'todos', mes: undefined }) // usa ano 'todos' para desativar filtros automáticos do backend
                 .then(setHistoricoVendas)
                 .catch(e => console.error("Erro ao carregar histórico:", e))
                 .finally(() => setLoadingPredict(false));
@@ -239,90 +246,134 @@ export default function Vendas() {
             frequenciaMediaGeral: 0
         };
 
-        // 1. Ponto de Referência Temporal Inteligente
-        const maxData = historicoVendas.reduce((max, v) => v.data > max ? v.data : max, '');
-        const mesForecast = maxData ? maxData.substring(0, 7) : new Date().toISOString().substring(0, 7);
-        const ultimoConsolidado = addMonths(mesForecast, -1);
+        // 1. Ponto de Referência Temporal Baseado no Mês Corrente (Maio de 2026)
+        const mesForecast = new Date().toISOString().substring(0, 7); // '2026-05' baseado na data do sistema
+        const ultimoConsolidado = addMonths(mesForecast, -1); // '2026-04'
 
-        // Filtrar histórico consolidado (apenas transações anteriores ao mês do forecast)
+        // Separar vendas históricas (antes do mês de forecast) e vendas do mês atual
         const historicoConsolidado = historicoVendas.filter(v => v.data < `${mesForecast}-01`);
+        const comprasMesAtual = historicoVendas.filter(v => v.data >= `${mesForecast}-01` && v.data < `${mesForecast}-32`);
 
-        // Agrupar compras por cliente no período consolidado
+        // Agrupar compras por cliente no histórico consolidado (até 30/04/2026)
         const gruposConsolidado: Record<string, Venda[]> = {};
         historicoConsolidado.forEach(v => {
             if (!gruposConsolidado[v.cliente]) gruposConsolidado[v.cliente] = [];
             gruposConsolidado[v.cliente].push(v);
         });
 
-        // Mapear cada cliente do consolidado com seus ciclos de recompra e inatividade
-        const clientesCalculados = Object.entries(gruposConsolidado).map(([nome, compras]) => {
-            const totalCompradoConsolidado = compras.reduce((acc, v) => acc + v.valor, 0);
+        // Agrupar compras por cliente no mês atual (Maio/2026)
+        const gruposMesAtual: Record<string, Venda[]> = {};
+        comprasMesAtual.forEach(v => {
+            if (!gruposMesAtual[v.cliente]) gruposMesAtual[v.cliente] = [];
+            gruposMesAtual[v.cliente].push(v);
+        });
+
+        // Obter lista única de todos os clientes históricos e do mês atual
+        const todosClientesNomes = Array.from(new Set([
+            ...Object.keys(gruposConsolidado),
+            ...Object.keys(gruposMesAtual)
+        ]));
+
+        // Mapear cada cliente com ciclos de recompra, inatividade e compras no mês corrente
+        const clientesCalculados = todosClientesNomes.map(nome => {
+            const comprasHistoricas = gruposConsolidado[nome] || [];
+            const comprasMesAtualCliente = gruposMesAtual[nome] || [];
             
-            // Datas civis distintas de compra (YYYY-MM)
-            const mesesAtivosSet = new Set(compras.map(v => v.data.substring(0, 7)));
-            const mesesAtivos = mesesAtivosSet.size;
+            const faturamentoRealMes = comprasMesAtualCliente.reduce((acc, v) => acc + v.valor, 0);
             
-            const faturamentoMedioMensal = mesesAtivos > 0 ? (totalCompradoConsolidado / mesesAtivos) : 0;
+            let totalCompradoConsolidado = 0;
+            let faturamentoMedioMensal = 0;
+            let cicloMedioMeses = 0;
+            let inatividadeMeses = 0;
+            let ultimaCompraDateBeforeMay = '';
             
-            const datasSorted = compras.map(v => v.data).sort();
-            const ultimaCompraDate = datasSorted[datasSorted.length - 1];
-            const primeiraCompraDate = datasSorted[0];
-            
-            const mesUltimaCompra = ultimaCompraDate.substring(0, 7);
-            const mesPrimeiraCompra = primeiraCompraDate.substring(0, 7);
-            
-            // Período total em meses civis no relacionamento consolidado (até o início do mês de forecast)
-            const periodoTotalMeses = Math.max(1, diffInMonthsCivil(mesForecast, mesPrimeiraCompra));
-            
-            // Ciclo médio em meses civis
-            const cicloMedioMeses = mesesAtivos > 0 ? (periodoTotalMeses / mesesAtivos) : 0;
-            
-            // Inatividade em meses civis em relação ao mês de forecast
-            const inatividadeMeses = diffInMonthsCivil(mesForecast, mesUltimaCompra);
-            
-            // Cálculo de probabilidade
-            const probInfo = calcularProbabilidade(cicloMedioMeses, inatividadeMeses);
-            
-            // Valor de Forecast (Expectativa Ponderada)
-            let valorForecast = 0;
-            if (probInfo.label === 'alta') {
-                valorForecast = faturamentoMedioMensal;
-            } else if (probInfo.label === 'media') {
-                valorForecast = faturamentoMedioMensal * 0.3;
+            if (comprasHistoricas.length > 0) {
+                totalCompradoConsolidado = comprasHistoricas.reduce((acc, v) => acc + v.valor, 0);
+                
+                // Datas civis distintas de compra (YYYY-MM)
+                const mesesAtivosSet = new Set(comprasHistoricas.map(v => v.data.substring(0, 7)));
+                const mesesAtivos = mesesAtivosSet.size;
+                
+                faturamentoMedioMensal = mesesAtivos > 0 ? (totalCompradoConsolidado / mesesAtivos) : 0;
+                
+                const datasSorted = comprasHistoricas.map(v => v.data).sort();
+                ultimaCompraDateBeforeMay = datasSorted[datasSorted.length - 1];
+                const primeiraCompraDate = datasSorted[0];
+                
+                // Período total em meses civis no relacionamento consolidado (até o início do mês de forecast)
+                const periodoTotalMeses = Math.max(1, diffInMonthsCivil(mesForecast, primeiraCompraDate.substring(0, 7)));
+                
+                // Ciclo médio em meses civis
+                cicloMedioMeses = mesesAtivos > 0 ? (periodoTotalMeses / mesesAtivos) : 0;
+                
+                // Inatividade em meses civis em relação ao mês de forecast
+                inatividadeMeses = diffInMonthsCivil(mesForecast, ultimaCompraDateBeforeMay.substring(0, 7));
+            } else {
+                // Cliente novo que só comprou no mês de forecast
+                faturamentoMedioMensal = faturamentoRealMes;
+                inatividadeMeses = 0;
             }
 
-            // Atribuição de Marcadores de Inatividade
+            // Cálculo híbrido de probabilidade e forecast
+            let probabilidade = 0;
+            let probabilidadeLabel: 'alta' | 'media' | 'baixa' = 'baixa';
+            let valorForecast = 0;
             let statusInatividade: ClientePredict['statusInatividade'] = 'ativo';
-            if (inatividadeMeses >= 24) {
-                statusInatividade = '2a+';
-            } else if (inatividadeMeses >= 12) {
-                statusInatividade = '1a';
-            } else if (inatividadeMeses >= 9) {
-                statusInatividade = '9m';
-            } else if (inatividadeMeses >= 6) {
-                statusInatividade = '6m';
-            } else if (inatividadeMeses >= 2) {
-                statusInatividade = '3m';
-            } else {
+            let ultimaCompraDate = '';
+
+            if (faturamentoRealMes > 0) {
+                // Cliente já comprou em Maio de 2026 (faturamento 100% real integrado no forecast)
+                inatividadeMeses = 0;
+                probabilidade = 100;
+                probabilidadeLabel = 'alta';
+                valorForecast = faturamentoRealMes;
                 statusInatividade = 'ativo';
+                ultimaCompraDate = comprasMesAtualCliente.map(v => v.data).sort().pop() || '';
+            } else {
+                // Cliente ainda não comprou em Maio de 2026 (projeção baseada em ciclo histórico)
+                ultimaCompraDate = ultimaCompraDateBeforeMay;
+                const probInfo = calcularProbabilidade(cicloMedioMeses, inatividadeMeses);
+                probabilidade = probInfo.percent;
+                probabilidadeLabel = probInfo.label;
+
+                if (probInfo.label === 'alta') {
+                    valorForecast = faturamentoMedioMensal;
+                } else if (probInfo.label === 'media') {
+                    valorForecast = faturamentoMedioMensal * 0.3;
+                }
+
+                // Classificação de status de inatividade
+                if (inatividadeMeses >= 24) {
+                    statusInatividade = '2a+';
+                } else if (inatividadeMeses >= 12) {
+                    statusInatividade = '1a';
+                } else if (inatividadeMeses >= 9) {
+                    statusInatividade = '9m';
+                } else if (inatividadeMeses >= 6) {
+                    statusInatividade = '6m';
+                } else if (inatividadeMeses >= 2) {
+                    statusInatividade = '3m';
+                } else {
+                    statusInatividade = 'ativo';
+                }
             }
 
             return {
                 nome,
-                totalComprado: totalCompradoConsolidado,
-                totalPedidos: compras.length,
+                totalComprado: totalCompradoConsolidado + faturamentoRealMes,
+                totalPedidos: comprasHistoricas.length + comprasMesAtualCliente.length,
                 faturamentoMedioMensal,
                 cicloMedioMeses,
                 inatividadeMeses,
                 ultimaCompraDate,
-                probabilidade: probInfo.percent,
-                probabilidadeLabel: probInfo.label,
+                probabilidade,
+                probabilidadeLabel,
                 statusInatividade,
                 valorForecast
             };
         });
 
-        // Somar forecast total do faturamento
+        // Somar forecast total do faturamento (soma das compras reais de Maio + a expectativa estocástica)
         const forecastTotal = clientesCalculados.reduce((acc, c) => acc + c.valorForecast, 0);
 
         // Construir série histórica mensal consolidada para o gráfico de linhas (últimos 6 meses + forecast)
@@ -342,7 +393,7 @@ export default function Vendas() {
         };
 
         const historicoGrafico = mesesGrafico.map(mes => {
-            // Soma real acumulado de todas as transações (incluindo as de forecast se houver)
+            // Soma real acumulado de todas as transações (incluindo as de forecast já reais se houver)
             const real = historicoVendas
                 .filter(v => v.data.startsWith(mes))
                 .reduce((acc, v) => acc + v.valor, 0);
@@ -363,8 +414,9 @@ export default function Vendas() {
         });
 
         // Clientes quentes recomendados para contato (Alta probabilidade e maior faturamento previsto)
-        const contatosQuentes = [...clientesCalculados]
-            .filter(c => c.probabilidadeLabel === 'alta')
+        // Filtrar apenas aqueles que ainda NÃO compraram em Maio e têm probabilidade alta
+        const contatosQuentes = clientesCalculados
+            .filter(c => c.probabilidadeLabel === 'alta' && c.inatividadeMeses > 0)
             .sort((a, b) => b.faturamentoMedioMensal - a.faturamentoMedioMensal)
             .slice(0, 5);
 
