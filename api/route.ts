@@ -853,7 +853,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 
                 const clienteId = findCliId(cliente);
                 
-                return { data, representante_id: repMap.get(vendedor)||null, cliente_id: clienteId, cliente_nome: cliente||null, valor_pedido: parseCurrency(getVal(r,'Valor do Pedido',' Valor do Pedido ','Valor','valor'))||null };
+                return { 
+                    data, 
+                    representante_id: repMap.get(vendedor)||null, 
+                    representante_nome: vendedor,
+                    cliente_id: clienteId, 
+                    cliente_nome: cliente||null, 
+                    valor_pedido: parseCurrency(getVal(r,'Valor do Pedido',' Valor do Pedido ','Valor','valor'))||null 
+                };
             }).filter(Boolean);
             vrCount = await insertBatch('vendas_representantes', vrRows as any[]);
 
@@ -871,6 +878,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     tipo_visita: String(getVal(r,'Tipo de Visita','tipo de visita')||'').trim()||null, 
                     responsavel_visita: String(getVal(r,'Responsável Pela Visita','Reponsável Pela Visita','responsável pela visita')||'').trim()||null,
                     representante_id: repMap.get(rep)||null, 
+                    representante_nome: rep,
                     cliente_id: clienteId, 
                     cliente_nome: cliente || null,
                     status: String(getVal(r,'Status','status')||'').trim()||null,
