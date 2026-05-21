@@ -759,6 +759,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             for (const [n,id] of cliMap) cliMapNorm.set(normNome(n), id);
             const findCliId = (n:string) => cliMap.get(n) || cliMapNorm.get(normNome(n)) || null;
 
+            // ── clientes faltantes nas vendas/visitas (Dynamic Registration) ─────
+            const clientToRepNameMap = new Map<string, string>();
+            for (const c of rawClientes) {
+                const cNome = String(getVal(c, 'Cliente', 'cliente') || '').trim();
+                const rNome = String(getVal(c, 'Representante', 'representante') || '').trim();
+                if (cNome && rNome) clientToRepNameMap.set(cNome, rNome);
+            }
+
+            const uniqueClientsFromSales = new Set<string>();
+            for (const v of rawVendas) {
+                const c = String(getVal(v, 'Cliente', 'cliente') || '').trim();
+                if (c) uniqueClientsFromSales.add(c);
+            }
+            for (const vr of rawVendasRep) {
+                const c = String(getVal(vr, 'Cliente', 'cliente') || '').trim();
+                if (c) uniqueClientsFromSales.add(c);
+            }
+            for (const vt of rawVisitas) {
+                const c = String(getVal(vt, 'Cliente', 'cliente') || '').trim();
+                if (c) uniqueClientsFromSales.add(c);
+            }
+
+            const missingClients: any[] = [];
+            for (const cNome of uniqueClientsFromSales) {
+                if (!findCliId(cNome)) {
+                    const repNome = clientToRepNameMap.get(cNome);
+                    missingClients.push({
+                        nome: cNome,
+                        uf: repNome ? (repEstadoMap.get(normalize(repNome)) || null) : null,
+                        status: 'Ativo',
+                        grupo: 'Importado Automaticamente',
+                        desconto: null,
+                        pagamento: null,
+                        prazo: null,
+                        representante_id: repNome ? (repMap.get(repNome) || null) : null,
+                        updated_at: new Date().toISOString(),
+                    });
+                }
+            }
+
+            if (missingClients.length > 0) {
+                await upsertBatch('clientes', missingClients, 'nome');
+                const { data: newCliData } = await supabase.from('clientes').select('id, nome');
+                cliMap.clear();
+                for (const c of (newCliData || [])) cliMap.set(c.nome, c.id);
+                cliMapNorm.clear();
+                for (const [n, id] of cliMap) cliMapNorm.set(normNome(n), id);
+            }
+
             // ── produtos ─────────────────────────────────────────────────
             const prodRows = rawCross.map((r:any) => {
                 const pn = String(getVal(r,'PN','pn')||'').trim();
@@ -779,13 +828,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
 
             // ── vendas ────────────────────────────────────────────────────
-            const clientToRepNameMap = new Map<string, string>();
-            for (const c of rawClientes) {
-                const cNome = String(getVal(c, 'Cliente', 'cliente') || '').trim();
-                const rNome = String(getVal(c, 'Representante', 'representante') || '').trim();
-                if (cNome && rNome) clientToRepNameMap.set(cNome, rNome);
-            }
-
             const vendasRows = rawVendas.map((r:any) => {
                 const data = parseDate(getVal(r,'Data','data'));
                 const cliente = String(getVal(r,'Cliente','cliente')||'').trim();
@@ -795,7 +837,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const repNomeStr = clientToRepNameMap.get(cliente);
                 const repId = repNomeStr ? repMap.get(repNomeStr) : undefined;
                 
-                return { data, cliente_id: findCliId(cliente), produto_id: prodMap.get(sku)||null, quantidade: parseCurrency(getVal(r,'Quantidade','quantidade'))||null, valor: parseCurrency(getVal(r,'Valor','valor'))||null, representante_id: repId||null };
+                const clienteId = findCliId(cliente);
+                if (!clienteId) return null; // Fallback de segurança
+                
+                return { data, cliente_id: clienteId, produto_id: prodMap.get(sku)||null, quantidade: parseCurrency(getVal(r,'Quantidade','quantidade'))||null, valor: parseCurrency(getVal(r,'Valor','valor'))||null, representante_id: repId||null };
             }).filter(Boolean);
             vendasCount = await insertBatch('vendas', vendasRows as any[]);
 
@@ -805,7 +850,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const vendedor = String(getVal(r,'Vendedor','vendedor')||'').trim();
                 const cliente = String(getVal(r,'Cliente','cliente')||'').trim();
                 if (!data||!vendedor) return null;
-                return { data, representante_id: repMap.get(vendedor)||null, cliente_id: findCliId(cliente), cliente_nome: cliente||null, valor_pedido: parseCurrency(getVal(r,'Valor do Pedido',' Valor do Pedido ','Valor','valor'))||null };
+                
+                const clienteId = findCliId(cliente);
+                
+                return { data, representante_id: repMap.get(vendedor)||null, cliente_id: clienteId, cliente_nome: cliente||null, valor_pedido: parseCurrency(getVal(r,'Valor do Pedido',' Valor do Pedido ','Valor','valor'))||null };
             }).filter(Boolean);
             vrCount = await insertBatch('vendas_representantes', vrRows as any[]);
 
@@ -815,12 +863,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const rep = String(getVal(r,'Representante','representante','Vendedor','vendedor')||'').trim();
                 const cliente = String(getVal(r,'Cliente','cliente')||'').trim();
                 if (!data||!rep) return null;
+                
+                const clienteId = findCliId(cliente);
+                
                 return { 
                     data, 
                     tipo_visita: String(getVal(r,'Tipo de Visita','tipo de visita')||'').trim()||null, 
                     responsavel_visita: String(getVal(r,'Responsável Pela Visita','Reponsável Pela Visita','responsável pela visita')||'').trim()||null,
                     representante_id: repMap.get(rep)||null, 
-                    cliente_id: findCliId(cliente), 
+                    cliente_id: clienteId, 
                     cliente_nome: cliente || null,
                     status: String(getVal(r,'Status','status')||'').trim()||null,
                     objetivos_metas: String(getVal(r,'Objetivos e Metas','Obetivos e Metas','objetivos e metas')||'').trim()||null,
