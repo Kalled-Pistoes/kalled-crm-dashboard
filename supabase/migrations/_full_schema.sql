@@ -19,6 +19,7 @@ CREATE TABLE representantes (
 CREATE TABLE clientes (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   nome             TEXT        NOT NULL UNIQUE,
+  uf               TEXT,
   status           TEXT,
   grupo            TEXT,
   desconto         TEXT,
@@ -32,14 +33,19 @@ CREATE TABLE clientes (
 -- 3. PRODUTOS (aba Cross do Excel)
 -- linhas: array com as marcas do produto ex: ['Metal Leve', 'KS']
 CREATE TABLE produtos (
-  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  pn         TEXT        NOT NULL UNIQUE,
-  descricao  TEXT,
-  linhas     TEXT[]      DEFAULT '{}',
-  created_at TIMESTAMPTZ DEFAULT now()
+  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  pn              TEXT        NOT NULL UNIQUE,
+  descricao       TEXT,
+  linhas          TEXT[]      DEFAULT '{}',
+  ref_metal_leve  TEXT,
+  ref_sulloy      TEXT,
+  ref_ks          TEXT,
+  ref_apex        TEXT,
+  ref_sintech     TEXT,
+  created_at      TIMESTAMPTZ DEFAULT now()
 );
 
--- 4. VENDAS (aba Vendas â€” uma linha por produto vendido)
+-- 4. VENDAS (aba Vendas — uma linha por produto vendido)
 -- representante_id denormalizado para RLS simples sem joins
 CREATE TABLE vendas (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -52,12 +58,13 @@ CREATE TABLE vendas (
   created_at       TIMESTAMPTZ DEFAULT now()
 );
 
--- 5. VENDAS REPRESENTANTES (aba Vendas Representantes â€” por pedido)
+-- 5. VENDAS REPRESENTANTES (aba Vendas Representantes — por pedido)
 CREATE TABLE vendas_representantes (
   id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   data             DATE        NOT NULL,
   representante_id UUID        NOT NULL REFERENCES representantes(id) ON DELETE CASCADE,
   cliente_id       UUID        REFERENCES clientes(id) ON DELETE SET NULL,
+  cliente_nome     TEXT,
   valor_pedido     NUMERIC,
   created_at       TIMESTAMPTZ DEFAULT now()
 );
@@ -70,6 +77,7 @@ CREATE TABLE visitas_tecnicas (
   responsavel_visita TEXT,
   representante_id   UUID        NOT NULL REFERENCES representantes(id) ON DELETE CASCADE,
   cliente_id         UUID        REFERENCES clientes(id) ON DELETE SET NULL,
+  cliente_nome       TEXT,
   status             TEXT,
   objetivos_metas    TEXT,
   potencial_compra   NUMERIC     DEFAULT 0,
@@ -323,3 +331,19 @@ CREATE POLICY "visitantes_public_insert"
   FOR INSERT
   TO anon, authenticated
   WITH CHECK (true);
+
+-- ============================================================
+-- Monitoramento de Sincronização (api_sync_status)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS api_sync_status (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  status        TEXT,
+  error_message TEXT,
+  last_sync     TIMESTAMPTZ,
+  updated_at    TIMESTAMPTZ DEFAULT now()
+);
+
+-- Insere o registro inicial se não existir
+INSERT INTO api_sync_status (id, status, last_sync, error_message, updated_at) 
+VALUES ('00000000-0000-0000-0000-000000000001', 'Nunca sincronizado', NULL, NULL, now()) 
+ON CONFLICT (id) DO NOTHING;
