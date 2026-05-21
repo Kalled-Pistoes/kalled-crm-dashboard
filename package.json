@@ -6,8 +6,9 @@
     "@supabase/supabase-js": "^2.99.2",
     "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
-    "xlsx": "^0.18.5",
-    "jszip": "^3.10.1"
+    "jszip": "^3.10.1",
+    "pg": "^8.21.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

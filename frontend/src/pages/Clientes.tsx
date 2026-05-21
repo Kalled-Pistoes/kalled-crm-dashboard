@@ -23,11 +23,28 @@ export default function Clientes() {
     const [filtroRep, setFiltroRep] = useState('');
     const [filtroStatus, setFiltroStatus] = useState('');
 
+    // Novos estados para o modal e edição de clientes
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [repsList, setRepsList] = useState<{ id?: string; nome: string }[]>([]);
+    const [editFormData, setEditFormData] = useState({
+        status: '',
+        grupo: '',
+        desconto: '',
+        pagamento: '',
+        prazo: '',
+        representante_id: ''
+    });
+    const [updating, setUpdating] = useState(false);
+
     useEffect(() => {
         api.getClientes()
             .then(setClientes)
             .catch(e => setError(e.message))
             .finally(() => setLoading(false));
+
+        api.getRepresentantes()
+            .then(setRepsList)
+            .catch(console.error);
     }, []);
 
     const representantes = useMemo(() => {
@@ -181,6 +198,45 @@ export default function Clientes() {
         document.body.removeChild(link);
     };
 
+    const handleOpenEditModal = () => {
+        if (!selectedCliente) return;
+        setEditFormData({
+            status: selectedCliente.Status || '',
+            grupo: selectedCliente.Grupo || '',
+            desconto: selectedCliente.Desconto || '',
+            pagamento: selectedCliente.Pagamento || '',
+            prazo: selectedCliente.Prazo || '',
+            representante_id: selectedCliente.representante_id || ''
+        });
+        setIsEditModalOpen(true);
+    };
+
+    const handleSaveEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedCliente || !selectedCliente.id) return;
+        setUpdating(true);
+        try {
+            const updated = await api.updateCliente(selectedCliente.id, {
+                status: editFormData.status,
+                grupo: editFormData.grupo,
+                desconto: editFormData.desconto,
+                pagamento: editFormData.pagamento,
+                prazo: editFormData.prazo,
+                representante_id: editFormData.representante_id || undefined
+            });
+            
+            // Atualiza a lista de clientes localmente
+            setClientes(prev => prev.map(c => c.id === selectedCliente.id ? { ...c, ...updated } : c));
+            // Atualiza o cliente selecionado
+            setSelectedCliente(prev => prev ? { ...prev, ...updated } : null);
+            setIsEditModalOpen(false);
+        } catch (e: any) {
+            alert(`Erro ao atualizar cadastro: ${e.message}`);
+        } finally {
+            setUpdating(false);
+        }
+    };
+
     if (loading) return (
         <div className="flex items-center justify-center h-64">
             <div className="w-8 h-8 border-2 border-[#C01717] border-t-transparent rounded-full animate-spin" />
@@ -314,13 +370,18 @@ export default function Clientes() {
 
                             {/* Header */}
                             <div className="px-4 sm:px-8 pt-6 sm:pt-8 pb-4 relative z-10">
-                                <div className="flex items-center gap-3 mb-2">
+                                <div className="flex items-center gap-2 mb-2">
                                     <span className={`inline-flex items-center px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide border ${selectedCliente.Status?.toLowerCase() === 'ativo'
                                         ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
                                         : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.2)]'
                                         }`}>
                                         {selectedCliente.Status?.toLowerCase() === 'ativo' ? 'Cliente Ativo' : 'Cliente Inativo'}
                                     </span>
+                                    {selectedCliente.editado_manualmente && (
+                                        <span className="inline-flex items-center px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide border bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse-slow">
+                                            Editado via Front-end
+                                        </span>
+                                    )}
                                 </div>
                                 <h2 className="text-2xl font-bold text-white mb-1 tracking-tight">
                                     {selectedCliente.Cliente || selectedCliente['Razão Social'] || 'Sem Nome'}
@@ -552,7 +613,10 @@ export default function Clientes() {
                                 <button className="btn-primary opacity-50 cursor-not-allowed" disabled>
                                     Ver Histórico de Pedidos
                                 </button>
-                                <button className="btn-ghost opacity-50 cursor-not-allowed" disabled>
+                                <button 
+                                    onClick={handleOpenEditModal}
+                                    className="btn-ghost cursor-pointer hover:bg-white/5 hover:text-white"
+                                >
                                     Editar Cadastro
                                 </button>
                             </div>
@@ -570,6 +634,127 @@ export default function Clientes() {
                     )}
                 </div>
             </div>
+
+            {/* Modal de Edição */}
+            {isEditModalOpen && selectedCliente && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+                    <div className="w-full max-w-lg bg-[#111113] border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        {/* Modal Header */}
+                        <div className="px-6 py-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Editar Cadastro</h3>
+                                <p className="text-xs text-slate-400 truncate max-w-[320px] mt-0.5">{selectedCliente.Cliente}</p>
+                            </div>
+                            <button 
+                                onClick={() => setIsEditModalOpen(false)}
+                                className="text-slate-400 hover:text-white transition-colors cursor-pointer text-xs font-bold bg-white/5 px-2.5 py-1 rounded-md border border-white/10"
+                            >
+                                Fechar
+                            </button>
+                        </div>
+
+                        {/* Modal Form */}
+                        <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Status</label>
+                                    <select
+                                        className="input w-full cursor-pointer bg-[#111113]"
+                                        value={editFormData.status}
+                                        onChange={e => setEditFormData(prev => ({ ...prev, status: e.target.value }))}
+                                    >
+                                        <option value="Ativo" className="bg-[#111113]">Ativo</option>
+                                        <option value="Inativo" className="bg-[#111113]">Inativo</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Grupo de Cliente</label>
+                                    <input
+                                        type="text"
+                                        className="input w-full"
+                                        placeholder="Ex: VIP, Varejo"
+                                        value={editFormData.grupo}
+                                        onChange={e => setEditFormData(prev => ({ ...prev, grupo: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Desconto Padrão</label>
+                                    <input
+                                        type="text"
+                                        className="input w-full"
+                                        placeholder="Ex: 10%, 15+5%"
+                                        value={editFormData.desconto}
+                                        onChange={e => setEditFormData(prev => ({ ...prev, desconto: e.target.value }))}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Prazo Médio</label>
+                                    <input
+                                        type="text"
+                                        className="input w-full"
+                                        placeholder="Ex: 30 dias, À vista"
+                                        value={editFormData.prazo}
+                                        onChange={e => setEditFormData(prev => ({ ...prev, prazo: e.target.value }))}
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Forma de Pagamento</label>
+                                <input
+                                    type="text"
+                                    className="input w-full"
+                                    placeholder="Ex: Boleto Bancário, Cartão de Crédito"
+                                    value={editFormData.pagamento}
+                                    onChange={e => setEditFormData(prev => ({ ...prev, pagamento: e.target.value }))}
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Representante Responsável</label>
+                                <select
+                                    className="input w-full cursor-pointer bg-[#111113]"
+                                    value={editFormData.representante_id}
+                                    onChange={e => setEditFormData(prev => ({ ...prev, representante_id: e.target.value }))}
+                                >
+                                    <option value="" className="bg-[#111113]">Nenhum representante associado</option>
+                                    {repsList.map(r => (
+                                        <option key={r.id} value={r.id} className="bg-[#111113]">{r.nome}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="pt-4 border-t border-white/5 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsEditModalOpen(false)}
+                                    className="btn-ghost text-xs px-5"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={updating}
+                                    className="bg-[#C01717] hover:bg-[#a01313] text-white text-xs font-bold uppercase tracking-wider rounded-xl px-6 py-2.5 shadow-lg shadow-[#C01717]/20 border border-[#C01717]/10 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {updating ? (
+                                        <>
+                                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                            <span>Salvando...</span>
+                                        </>
+                                    ) : (
+                                        <span>Salvar Alterações</span>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

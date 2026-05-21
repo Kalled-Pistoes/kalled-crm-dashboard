@@ -308,7 +308,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (!user) return;
             const repId = await getRepresentanteId(user);
             let qCli: any = supabase.from('clientes')
-                .select('nome, status, grupo, desconto, pagamento, prazo, representante:representante_id(nome)');
+                .select('id, nome, status, grupo, desconto, pagamento, prazo, representante_id, editado_manualmente, representante:representante_id(nome)');
             if (repId) qCli = qCli.eq('representante_id', repId);
             const { data: clientes, error: cliErr } = await qCli;
             if (cliErr) return res.status(500).json({ error: cliErr.message });
@@ -328,12 +328,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     ? (today.getTime() - new Date(`${ultimaCompra}T12:00:00Z`).getTime()) / (1000 * 60 * 60 * 24 * 30.44)
                     : Infinity;
                 return {
+                    id: c.id,
                     Cliente: c.nome, 'Razão Social': c.nome, Representante: c.representante?.nome ?? '',
                     Status: diffMonths > 4 ? 'Inativo' : 'Ativo',
+                    Grupo: c.grupo ?? '',
                     Desconto: c.desconto ?? '', Pagamento: c.pagamento ?? '',
-                    Prazo: c.prazo ?? '', ultimaCompra: ultimaCompra || undefined,
+                    Prazo: c.prazo ?? '', 
+                    representante_id: c.representante_id ?? '',
+                    editado_manualmente: !!c.editado_manualmente,
+                    ultimaCompra: ultimaCompra || undefined,
                 };
             }));
+        }
+
+        // ── clientes/:id/update ─────────────────────────────────────────────
+        if (s0 === 'clientes' && s1 && s2 === 'update') {
+            const user = requireAuth(req, res);
+            if (!user) return;
+            if (req.method !== 'PUT') return res.status(405).json({ error: 'Method not allowed' });
+            
+            const id = s1;
+            const { status, grupo, desconto, pagamento, prazo, representante_id } = req.body || {};
+            
+            const updates = {
+                status: status || null,
+                grupo: grupo || null,
+                desconto: desconto || null,
+                pagamento: pagamento || null,
+                prazo: prazo || null,
+                representante_id: representante_id || null,
+                editado_manualmente: true,
+                updated_at: new Date().toISOString()
+            };
+            
+            const { data, error } = await supabase.from('clientes')
+                .update(updates)
+                .eq('id', id)
+                .select('id, nome, status, grupo, desconto, pagamento, prazo, representante_id, editado_manualmente, representante:representante_id(nome)')
+                .single();
+                
+            if (error) return res.status(500).json({ error: error.message });
+            
+            // Retorna o cliente atualizado mapeado no mesmo formato da listagem
+            const today = new Date();
+            // Buscar última compra para retornar o status correto
+            let qVendas: any = supabase.from('vendas').select('data').eq('cliente_id', id).order('data', { ascending: false }).limit(1);
+            const { data: vendasRec } = await qVendas;
+            const ultimaCompra = vendasRec?.[0]?.data || undefined;
+            const diffMonths = ultimaCompra
+                ? (today.getTime() - new Date(`${ultimaCompra}T12:00:00Z`).getTime()) / (1000 * 60 * 60 * 24 * 30.44)
+                : Infinity;
+
+            return res.json({
+                id: data.id,
+                Cliente: data.nome, 'Razão Social': data.nome, Representante: (data.representante as any)?.nome ?? '',
+                Status: diffMonths > 4 ? 'Inativo' : 'Ativo',
+                Grupo: data.grupo ?? '',
+                Desconto: data.desconto ?? '', Pagamento: data.pagamento ?? '',
+                Prazo: data.prazo ?? '',
+                representante_id: data.representante_id ?? '',
+                editado_manualmente: !!data.editado_manualmente,
+                ultimaCompra: ultimaCompra || undefined,
+            });
         }
 
         if (s0 === 'clientes' && s1 === 'top') {
@@ -397,11 +453,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const user = requireAuth(req, res);
             if (!user) return;
             const repId = await getRepresentanteId(user);
-            let q: any = supabase.from('representantes').select('nome, estado, meta_mensal');
+            let q: any = supabase.from('representantes').select('id, nome, estado, meta_mensal');
             if (repId) q = q.eq('id', repId);
             const { data, error } = await q.order('nome');
             if (error) return res.status(500).json({ error: error.message });
-            return res.json((data || []).map((r: any) => ({ nome: r.nome, estado: r.estado || '', meta: r.meta_mensal || 0 })));
+            return res.json((data || []).map((r: any) => ({ id: r.id, nome: r.nome, estado: r.estado || '', meta: r.meta_mensal || 0 })));
         }
 
         if (s0 === 'representantes' && s1 && s2 === 'vendas-por-mes') {
@@ -737,8 +793,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const repMap = new Map<string,string>((repsData||[]).map((r:any)=>[r.nome,r.id]));
 
             // ── clientes ─────────────────────────────────────────────────
+            const { data: manualClients } = await supabase.from('clientes').select('nome').eq('editado_manualmente', true);
+            const manualNamesSet = new Set((manualClients || []).map((c: any) => c.nome));
+
             const cliRows = rawClientes.map((r:any) => {
                 const nome = String(getVal(r,'Cliente','cliente','Razão Social')||'').trim();
+                if (!nome) return null;
+                if (manualNamesSet.has(nome)) return null; // Ignora atualização do Excel se alterado via front-end
+
                 const repNome = String(getVal(r,'Representante','representante')||'').trim();
                 return {
                     nome, uf: repEstadoMap.get(normalize(repNome))||null,
@@ -750,8 +812,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     representante_id: repMap.get(repNome)||null,
                     updated_at: new Date().toISOString(),
                 };
-            }).filter((c:any)=>c.nome);
-            cliCount = await upsertBatch('clientes', cliRows, 'nome');
+            }).filter((c:any)=>c && c.nome);
+            cliCount = await upsertBatch('clientes', cliRows as any[], 'nome');
             const { data: cliData } = await supabase.from('clientes').select('id, nome');
             const cliMap = new Map<string,string>((cliData||[]).map((c:any)=>[c.nome,c.id]));
             const normNome = (s:string) => s.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]/g,' ').replace(/\s+/g,' ').trim();

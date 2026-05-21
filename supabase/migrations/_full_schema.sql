@@ -17,17 +17,18 @@ CREATE TABLE representantes (
 
 -- 2. CLIENTES
 CREATE TABLE clientes (
-  id               UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  nome             TEXT        NOT NULL UNIQUE,
-  uf               TEXT,
-  status           TEXT,
-  grupo            TEXT,
-  desconto         TEXT,
-  pagamento        TEXT,
-  prazo            TEXT,
-  representante_id UUID        REFERENCES representantes(id) ON DELETE SET NULL,
-  created_at       TIMESTAMPTZ DEFAULT now(),
-  updated_at       TIMESTAMPTZ DEFAULT now()
+  id                  UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome                TEXT        NOT NULL UNIQUE,
+  uf                  TEXT,
+  status              TEXT,
+  grupo               TEXT,
+  desconto            TEXT,
+  pagamento           TEXT,
+  prazo               TEXT,
+  representante_id    UUID        REFERENCES representantes(id) ON DELETE SET NULL,
+  editado_manualmente BOOLEAN     DEFAULT false,
+  created_at          TIMESTAMPTZ DEFAULT now(),
+  updated_at          TIMESTAMPTZ DEFAULT now()
 );
 
 -- 3. PRODUTOS (aba Cross do Excel)

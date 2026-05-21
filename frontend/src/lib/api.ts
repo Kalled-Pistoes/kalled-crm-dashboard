@@ -47,17 +47,22 @@ export interface Venda {
 }
 
 export interface Cliente {
+    id?: string;
     Cliente?: string;
     'Razão Social'?: string;
     Representante?: string;
     Status?: string;
+    Grupo?: string;
     Desconto?: string;
     Pagamento?: string;
     Prazo?: string;
+    representante_id?: string;
+    editado_manualmente?: boolean;
     ultimaCompra?: string;
 }
 
 export interface Representante {
+    id?: string;
     nome: string;
     estado: string;
     meta: number;
@@ -178,6 +183,26 @@ export const api = {
     getRanking: (filters?: Filters) => fetchJson<RankingVendedor[]>('/api/vendas/ranking', filters as any),
     getVendasPorRepresentante: (filters?: Filters) => fetchJson<RepresentanteVendas[]>('/api/vendas/por-representante', filters as any),
     getClientes: () => fetchJson<Cliente[]>('/api/clientes'),
+    updateCliente: (id: string, data: {
+        status?: string;
+        grupo?: string;
+        desconto?: string;
+        pagamento?: string;
+        prazo?: string;
+        representante_id?: string;
+    }) => {
+        return fetch(`${API_BASE}/api/clientes/${id}/update`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                ...authHeader()
+            },
+            body: JSON.stringify(data)
+        }).then(res => {
+            if (!res.ok) throw new Error(`Erro ao atualizar cliente: ${res.statusText}`);
+            return res.json();
+        }) as Promise<Cliente>;
+    },
     getClienteVendasPorMes: (nome: string) => fetchJson<ClienteVendasMes[]>(`/api/clientes/${encodeURIComponent(nome)}/vendas-por-mes`),
     getClienteItensNaoComprados: (nome: string) => fetchJson<ItensNaoComprados>(`/api/clientes/${encodeURIComponent(nome)}/itens-nao-comprados`),
     getClientesTop: (filters?: Filters) => fetchJson<ClienteTop[]>('/api/clientes/top', filters as any),
