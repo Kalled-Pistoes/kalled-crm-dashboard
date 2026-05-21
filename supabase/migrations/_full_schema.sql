@@ -1,4 +1,4 @@
-﻿-- ============================================================
+-- ============================================================
 -- CRM Kalled Pistoes - Schema inicial
 -- Execute no SQL Editor do Supabase (em ordem)
 -- ============================================================
@@ -217,6 +217,12 @@ CREATE TABLE catalogo_produtos (
   ref_anel_kalled       TEXT,
   espessura_canaletas   TEXT,
   anel_kalled           TEXT,
+  observacao            TEXT,
+  tipo                  TEXT,
+  combustivel           TEXT,
+  medida_haste          TEXT,
+  comprimento_total     TEXT,
+  image_url             TEXT,
   created_at            TIMESTAMPTZ DEFAULT now(),
   updated_at            TIMESTAMPTZ DEFAULT now()
 );
