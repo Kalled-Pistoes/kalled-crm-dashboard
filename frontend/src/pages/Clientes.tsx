@@ -22,6 +22,7 @@ export default function Clientes() {
     const [search, setSearch] = useState('');
     const [filtroRep, setFiltroRep] = useState('');
     const [filtroStatus, setFiltroStatus] = useState('');
+    const [ordem, setOrdem] = useState<'asc' | 'desc'>('asc');
 
     // Novos estados para o modal e edição de clientes
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -54,14 +55,24 @@ export default function Clientes() {
 
     const filtered = useMemo(() => {
         const q = search.toLowerCase();
-        return clientes.filter(c => {
+        const res = clientes.filter(c => {
             const nome = (c.Cliente ?? c['Razão Social'] ?? '').toLowerCase();
             const matchSearch = !q || nome.includes(q);
             const matchRep = !filtroRep || c.Representante === filtroRep;
             const matchStatus = !filtroStatus || (c.Status ?? '').toLowerCase() === filtroStatus;
             return matchSearch && matchRep && matchStatus;
         });
-    }, [clientes, search, filtroRep, filtroStatus]);
+
+        return res.sort((a, b) => {
+            const nomeA = a.Cliente ?? a['Razão Social'] ?? '';
+            const nomeB = b.Cliente ?? b['Razão Social'] ?? '';
+            if (ordem === 'asc') {
+                return nomeA.localeCompare(nomeB, 'pt-BR', { sensitivity: 'base' });
+            } else {
+                return nomeB.localeCompare(nomeA, 'pt-BR', { sensitivity: 'base' });
+            }
+        });
+    }, [clientes, search, filtroRep, filtroStatus, ordem]);
 
     const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
 
@@ -291,6 +302,14 @@ export default function Clientes() {
                         <option key={r} value={r} className="bg-[#111113]">{r}</option>
                     ))}
                 </select>
+                <select
+                    className="input max-w-[150px] cursor-pointer flex-1 min-w-[120px]"
+                    value={ordem}
+                    onChange={e => setOrdem(e.target.value as 'asc' | 'desc')}
+                >
+                    <option value="asc" className="bg-[#111113]">Ordem A-Z</option>
+                    <option value="desc" className="bg-[#111113]">Ordem Z-A</option>
+                </select>
                 <div className="flex rounded-lg border border-white/10 overflow-hidden">
                     {[{ label: 'Todos', value: '' }, { label: 'Ativo', value: 'ativo' }, { label: 'Inativo', value: 'inativo' }].map(opt => (
                         <button
@@ -313,7 +332,7 @@ export default function Clientes() {
             </div>
 
             {/* Layout Master-Detail */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:h-[820px]">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:h-[calc(100vh-180px)]">
                 {/* Master List */}
                 <div className="card-premium p-0 flex flex-col h-[400px] lg:h-full overflow-hidden border border-white/10 shadow-2xl">
                     <div className="p-4 border-b border-white/5 bg-white/5">
