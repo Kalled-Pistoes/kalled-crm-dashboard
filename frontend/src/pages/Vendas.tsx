@@ -1,38 +1,84 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Calendar, TrendingUp, UserCheck, AlertTriangle, Clock, ArrowRight, Filter, Sparkles } from 'lucide-react';
+import { Search, Calendar, TrendingUp, UserCheck, Clock, ArrowRight, Filter, Sparkles, PhoneCall } from 'lucide-react';
+import {
+    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+} from 'recharts';
 import { api, Venda, formatCurrency, formatDate, Filters } from '../lib/api';
 
-// Funções utilitárias seguras para datas sem distorção de fuso horário
-function parseDate(dateStr: string): Date {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    return new Date(year, month - 1, day);
+// Utilitários adicionais para Forecasting baseados em meses civis (sem distorções)
+function addMonths(mesStr: string, diff: number): string {
+    const [year, month] = mesStr.split('-').map(Number);
+    const date = new Date(year, month - 1 + diff, 1);
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
 }
 
-function diffInDays(dateStr1: string, dateStr2: string): number {
-    const d1 = parseDate(dateStr1);
-    const d2 = parseDate(dateStr2);
-    return Math.floor((d1.getTime() - d2.getTime()) / (1000 * 60 * 60 * 24));
+function diffInMonthsCivil(mes1: string, mes2: string): number {
+    const [y1, m1] = mes1.split('-').map(Number);
+    const [y2, m2] = mes2.split('-').map(Number);
+    return (y1 - y2) * 12 + (m1 - m2);
 }
 
-function addDays(dateStr: string, days: number): string {
-    const d = parseDate(dateStr);
-    d.setDate(d.getDate() + Math.round(days));
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+// Algoritmo matemático para probabilidade de recompra no mês de forecast
+function calcularProbabilidade(c: number, inatividadeMeses: number): { percent: number; label: 'alta' | 'media' | 'baixa' } {
+    // Penalização pesada de Churn se inativo há mais de 6 meses
+    if (inatividadeMeses > 6) {
+        return { percent: Math.max(5, Math.round(15 - (inatividadeMeses - 6) * 1.5)), label: 'baixa' };
+    }
+    
+    // Compra única (ciclo indefinido)
+    if (c === 0) {
+        if (inatividadeMeses <= 2) {
+            return { percent: 45, label: 'media' };
+        } else if (inatividadeMeses <= 4) {
+            return { percent: 25, label: 'baixa' };
+        } else {
+            return { percent: 10, label: 'baixa' };
+        }
+    }
+    
+    // Cliente recorrente que compra todo mês
+    if (c <= 1.2 && inatividadeMeses === 1) {
+        return { percent: 95, label: 'alta' };
+    }
+    
+    const dif = inatividadeMeses - c;
+    
+    if (Math.abs(dif) < 0.5) {
+        // Exatamente no prazo estimado de recompra
+        return { percent: 88, label: 'alta' };
+    } else if (dif < 0) {
+        // Ainda não atingiu o intervalo do ciclo
+        if (Math.abs(dif) <= 1.1) {
+            return { percent: 55, label: 'media' };
+        }
+        return { percent: 20, label: 'baixa' };
+    } else {
+        // Atrasado em relação ao ciclo
+        if (dif <= 1.1) {
+            return { percent: 72, label: 'alta' }; // Ligeiramente atrasado
+        } else if (dif <= 2.1) {
+            return { percent: 45, label: 'media' }; // Atrasado médio
+        } else {
+            return { percent: 15, label: 'baixa' }; // Churn presumido a curto prazo
+        }
+    }
 }
 
 interface ClientePredict {
     nome: string;
     totalComprado: number;
     totalPedidos: number;
-    intervaloMedioMeses: number;
-    diasInatividade: number;
+    faturamentoMedioMensal: number;
+    cicloMedioMeses: number;
+    inatividadeMeses: number;
     ultimaCompraDate: string;
-    proximaCompraEstimada: string;
+    probabilidade: number;
+    probabilidadeLabel: 'alta' | 'media' | 'baixa';
     statusInatividade: 'ativo' | '3m' | '6m' | '9m' | '1a' | '2a+';
+    valorForecast: number;
 }
 
 export default function Vendas() {
@@ -182,90 +228,173 @@ export default function Vendas() {
         clientesAgregados.reduce((acc, c) => acc + c.valorTotal, 0), [clientesAgregados]);
 
     // Processamento do Predict Comercial com base no histórico completo
-    const clientesPredict = useMemo(() => {
-        if (historicoVendas.length === 0) return [];
+    const predictData = useMemo(() => {
+        if (historicoVendas.length === 0) return {
+            clientes: [],
+            forecastTotal: 0,
+            historicoGrafico: [],
+            contatosQuentes: [],
+            ultimoMesConsolidadoLabel: '',
+            mesForecastLabel: '',
+            frequenciaMediaGeral: 0
+        };
 
-        // Agrupar transações por cliente
-        const grupos: Record<string, Venda[]> = {};
-        historicoVendas.forEach(v => {
-            if (!grupos[v.cliente]) grupos[v.cliente] = [];
-            grupos[v.cliente].push(v);
+        // 1. Ponto de Referência Temporal Inteligente
+        const maxData = historicoVendas.reduce((max, v) => v.data > max ? v.data : max, '');
+        const mesForecast = maxData ? maxData.substring(0, 7) : new Date().toISOString().substring(0, 7);
+        const ultimoConsolidado = addMonths(mesForecast, -1);
+
+        // Filtrar histórico consolidado (apenas transações anteriores ao mês do forecast)
+        const historicoConsolidado = historicoVendas.filter(v => v.data < `${mesForecast}-01`);
+
+        // Agrupar compras por cliente no período consolidado
+        const gruposConsolidado: Record<string, Venda[]> = {};
+        historicoConsolidado.forEach(v => {
+            if (!gruposConsolidado[v.cliente]) gruposConsolidado[v.cliente] = [];
+            gruposConsolidado[v.cliente].push(v);
         });
 
-        // Ponto de referência inteligente
-        const maxData = historicoVendas.reduce((max, v) => v.data > max ? v.data : max, '');
-        // Se a data máxima for recente (sistema atual), usa 'hoje', se for histórica de 2024, usa a data máxima
-        const dataReferenciaStr = maxData && new Date(maxData) > new Date('2025-01-01') 
-            ? new Date().toISOString().split('T')[0] 
-            : maxData;
-
-        return Object.entries(grupos).map(([clienteNome, compras]) => {
-            const totalComprado = compras.reduce((acc, v) => acc + v.valor, 0);
+        // Mapear cada cliente do consolidado com seus ciclos de recompra e inatividade
+        const clientesCalculados = Object.entries(gruposConsolidado).map(([nome, compras]) => {
+            const totalCompradoConsolidado = compras.reduce((acc, v) => acc + v.valor, 0);
             
-            // Datas distintas de compra
-            const datasDistintas = Array.from(new Set(compras.map(v => v.data))).sort();
-            const totalPedidos = datasDistintas.length;
-            const ultimaCompraDate = datasDistintas[datasDistintas.length - 1];
-
-            // Intervalo médio em dias
-            let intervaloMedioDias = 0;
-            if (totalPedidos > 1) {
-                const diffs = [];
-                for (let i = 1; i < datasDistintas.length; i++) {
-                    diffs.push(diffInDays(datasDistintas[i], datasDistintas[i - 1]));
-                }
-                intervaloMedioDias = diffs.reduce((a, b) => a + b, 0) / diffs.length;
-            }
-
-            const intervaloMedioMeses = intervaloMedioDias > 0 ? (intervaloMedioDias / 30.4) : 0;
-            const diasInatividade = diffInDays(dataReferenciaStr, ultimaCompraDate);
-
-            // Previsão de próxima compra
-            let proximaCompraEstimada = '';
-            if (intervaloMedioDias > 0) {
-                proximaCompraEstimada = addDays(ultimaCompraDate, intervaloMedioDias);
+            // Datas civis distintas de compra (YYYY-MM)
+            const mesesAtivosSet = new Set(compras.map(v => v.data.substring(0, 7)));
+            const mesesAtivos = mesesAtivosSet.size;
+            
+            const faturamentoMedioMensal = mesesAtivos > 0 ? (totalCompradoConsolidado / mesesAtivos) : 0;
+            
+            const datasSorted = compras.map(v => v.data).sort();
+            const ultimaCompraDate = datasSorted[datasSorted.length - 1];
+            const primeiraCompraDate = datasSorted[0];
+            
+            const mesUltimaCompra = ultimaCompraDate.substring(0, 7);
+            const mesPrimeiraCompra = primeiraCompraDate.substring(0, 7);
+            
+            // Período total em meses civis no relacionamento consolidado (até o início do mês de forecast)
+            const periodoTotalMeses = Math.max(1, diffInMonthsCivil(mesForecast, mesPrimeiraCompra));
+            
+            // Ciclo médio em meses civis
+            const cicloMedioMeses = mesesAtivos > 0 ? (periodoTotalMeses / mesesAtivos) : 0;
+            
+            // Inatividade em meses civis em relação ao mês de forecast
+            const inatividadeMeses = diffInMonthsCivil(mesForecast, mesUltimaCompra);
+            
+            // Cálculo de probabilidade
+            const probInfo = calcularProbabilidade(cicloMedioMeses, inatividadeMeses);
+            
+            // Valor de Forecast (Expectativa Ponderada)
+            let valorForecast = 0;
+            if (probInfo.label === 'alta') {
+                valorForecast = faturamentoMedioMensal;
+            } else if (probInfo.label === 'media') {
+                valorForecast = faturamentoMedioMensal * 0.3;
             }
 
             // Atribuição de Marcadores de Inatividade
             let statusInatividade: ClientePredict['statusInatividade'] = 'ativo';
-            // Se inativo por tempo suficiente ou ciclo médio estendido
-            if (diasInatividade > 730) {
+            if (inatividadeMeses >= 24) {
                 statusInatividade = '2a+';
-            } else if (diasInatividade > 365) {
+            } else if (inatividadeMeses >= 12) {
                 statusInatividade = '1a';
-            } else if (diasInatividade > 270) {
+            } else if (inatividadeMeses >= 9) {
                 statusInatividade = '9m';
-            } else if (diasInatividade > 180) {
+            } else if (inatividadeMeses >= 6) {
                 statusInatividade = '6m';
-            } else if (diasInatividade > 90) {
+            } else if (inatividadeMeses >= 2) {
                 statusInatividade = '3m';
-            } else if (intervaloMedioDias > 0 && diasInatividade > (intervaloMedioDias * 1.2)) {
-                // Se passou 20% do prazo esperado de re-compra, marca como inativo leve (3 meses ou ativo a depender)
-                statusInatividade = diasInatividade > 60 ? '3m' : 'ativo';
+            } else {
+                statusInatividade = 'ativo';
             }
 
             return {
-                nome: clienteNome,
-                totalComprado,
-                totalPedidos,
-                intervaloMedioMeses,
-                diasInatividade,
+                nome,
+                totalComprado: totalCompradoConsolidado,
+                totalPedidos: compras.length,
+                faturamentoMedioMensal,
+                cicloMedioMeses,
+                inatividadeMeses,
                 ultimaCompraDate,
-                proximaCompraEstimada,
-                statusInatividade
+                probabilidade: probInfo.percent,
+                probabilidadeLabel: probInfo.label,
+                statusInatividade,
+                valorForecast
             };
         });
+
+        // Somar forecast total do faturamento
+        const forecastTotal = clientesCalculados.reduce((acc, c) => acc + c.valorForecast, 0);
+
+        // Construir série histórica mensal consolidada para o gráfico de linhas (últimos 6 meses + forecast)
+        const mesesGrafico: string[] = [];
+        for (let i = -6; i < 0; i++) {
+            mesesGrafico.push(addMonths(mesForecast, i));
+        }
+        mesesGrafico.push(mesForecast);
+
+        // Tradução e formatação
+        const MESES_ABR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const formatMesAno = (mesStr: string): string => {
+            const [ano, mes] = mesStr.split('-');
+            const mesIdx = parseInt(mes, 10) - 1;
+            const anoCurto = ano.substring(2);
+            return `${MESES_ABR[mesIdx]}/${anoCurto}`;
+        };
+
+        const historicoGrafico = mesesGrafico.map(mes => {
+            // Soma real acumulado de todas as transações (incluindo as de forecast se houver)
+            const real = historicoVendas
+                .filter(v => v.data.startsWith(mes))
+                .reduce((acc, v) => acc + v.valor, 0);
+
+            let forecast: number | undefined = undefined;
+            if (mes === mesForecast) {
+                forecast = forecastTotal;
+            } else if (mes === ultimoConsolidado) {
+                // Duplica o real consolidado do último mês para ligar a linha pontilhada sem buracos
+                forecast = real;
+            }
+
+            return {
+                mes: formatMesAno(mes),
+                real: real > 0 || mes !== mesForecast ? real : undefined,
+                forecast
+            };
+        });
+
+        // Clientes quentes recomendados para contato (Alta probabilidade e maior faturamento previsto)
+        const contatosQuentes = [...clientesCalculados]
+            .filter(c => c.probabilidadeLabel === 'alta')
+            .sort((a, b) => b.faturamentoMedioMensal - a.faturamentoMedioMensal)
+            .slice(0, 5);
+
+        // Frequência média geral dos clientes regulares (com compras recorrentes)
+        const clientesRecorrentes = clientesCalculados.filter(c => c.cicloMedioMeses > 0);
+        const frequenciaMediaGeral = clientesRecorrentes.length > 0
+            ? (clientesRecorrentes.reduce((acc, c) => acc + c.cicloMedioMeses, 0) / clientesRecorrentes.length)
+            : 0;
+
+        return {
+            clientes: clientesCalculados,
+            forecastTotal,
+            historicoGrafico,
+            contatosQuentes,
+            ultimoMesConsolidadoLabel: formatMesAno(ultimoConsolidado),
+            mesForecastLabel: formatMesAno(mesForecast),
+            frequenciaMediaGeral
+        };
     }, [historicoVendas]);
 
-    // Filtragem dos clientes na aba Predict
+    // Filtragem dos clientes na aba Predict baseada nos novos dados calculados
     const filteredPredict = useMemo(() => {
         const q = searchPredict.toLowerCase();
-        return clientesPredict.filter(c => {
+        const { clientes } = predictData;
+        return clientes.filter(c => {
             const matchSearch = !q || c.nome.toLowerCase().includes(q);
             const matchStatus = filtroInatividade === 'all' || c.statusInatividade === filtroInatividade;
             return matchSearch && matchStatus;
         });
-    }, [clientesPredict, searchPredict, filtroInatividade]);
+    }, [predictData, searchPredict, filtroInatividade]);
 
     if (loading) return (
         <div className="flex items-center justify-center h-64">
@@ -611,177 +740,324 @@ export default function Vendas() {
 
             {/* TAB 2: PREDICT COMERCIAL */}
             {activeTab === 'predict' && (
-                <div className="space-y-6 animate-in fade-in duration-200">
+                loadingPredict ? (
+                    <div className="flex flex-col items-center justify-center py-20 gap-4">
+                        <div className="w-8 h-8 border-2 border-[#C01717] border-t-transparent rounded-full animate-spin" />
+                        <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider animate-pulse">Calculando Ciclos & Predições Comerciais...</p>
+                    </div>
+                ) : (
+                    <div className="space-y-6 animate-in fade-in duration-200">
                     
-                    {/* Filtros da aba de Predição */}
-                    <div className="flex flex-wrap gap-3 items-center justify-between">
-                        <div className="relative flex-1 min-w-[200px] max-w-sm group">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-[#e05050] transition-colors" />
-                            <input
-                                className="input pl-9"
-                                placeholder="Buscar cliente no predict..."
-                                value={searchPredict}
-                                onChange={e => setSearchPredict(e.target.value)}
-                            />
+                    {/* Seção Superior: KPIs e Gráfico Amplo */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Card 1: Faturamento Estimado */}
+                        <div className="card-premium py-4 px-5 border-l-4 border-emerald-500 bg-black/45 backdrop-blur-md shadow-2xl">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Faturamento Estimado ({predictData.mesForecastLabel})</span>
+                                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                            </div>
+                            <p className="text-2xl font-black text-emerald-400">{formatCurrency(predictData.forecastTotal)}</p>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">Soma ponderada por probabilidade de recompra.</p>
                         </div>
 
-                        {/* Segmentação Comercial (Marcadores) */}
-                        <div className="flex flex-wrap gap-1 bg-white/5 border border-white/10 rounded-xl p-1">
-                            {([
-                                { id: 'all', label: 'Todos' },
-                                { id: 'ativo', label: 'Ciclo Ativo' },
-                                { id: '3m', label: '+3 Meses' },
-                                { id: '6m', label: '+6 Meses' },
-                                { id: '9m', label: '+9 Meses' },
-                                { id: '1a', label: '+1 Ano' },
-                                { id: '2a+', label: '+2 Anos' }
-                            ] as const).map(opt => (
-                                <button
-                                    key={opt.id}
-                                    onClick={() => setFiltroInatividade(opt.id)}
-                                    className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
-                                        filtroInatividade === opt.id
-                                            ? 'bg-white/15 text-white'
-                                            : 'text-slate-500 hover:text-slate-300'
-                                    }`}
-                                >
-                                    {opt.label}
-                                </button>
-                            ))}
+                        {/* Card 2: Contatos Quentes */}
+                        <div className="card-premium py-4 px-5 border-l-4 border-[#C01717] bg-black/45 backdrop-blur-md shadow-2xl">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Clientes Quentes (Alta Probabilidade)</span>
+                                <UserCheck className="w-4 h-4 text-[#f87171]" />
+                            </div>
+                            <p className="text-2xl font-black text-white">
+                                {predictData.clientes.filter(c => c.probabilidadeLabel === 'alta').length}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">Clientes com probabilidade de compra &ge; 70%.</p>
+                        </div>
+
+                        {/* Card 3: Frequência Geral */}
+                        <div className="card-premium py-4 px-5 border-l-4 border-amber-500 bg-black/45 backdrop-blur-md shadow-2xl">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Ciclo Médio Geral de Recompra</span>
+                                <Clock className="w-4 h-4 text-amber-400" />
+                            </div>
+                            <p className="text-2xl font-black text-amber-400">
+                                {predictData.frequenciaMediaGeral > 0 
+                                    ? `${predictData.frequenciaMediaGeral.toFixed(1)} meses` 
+                                    : 'Sem dados'}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">Média ponderada do intervalo entre compras.</p>
                         </div>
                     </div>
 
-                    {loadingPredict ? (
-                        <div className="flex flex-col items-center justify-center py-20 gap-4">
-                            <div className="w-8 h-8 border-2 border-[#C01717] border-t-transparent rounded-full animate-spin" />
-                            <p className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Calculando Ciclos & Predições Comerciais...</p>
-                        </div>
-                    ) : (
-                        <div className="card-premium p-0 overflow-hidden shadow-2xl border border-white/10">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-white/5 border-b border-white/10 text-slate-500">
-                                        <tr>
-                                            <th className="text-left text-[10px] font-bold uppercase tracking-wider px-6 py-4">Cliente</th>
-                                            <th className="text-center text-[10px] font-bold uppercase tracking-wider px-4 py-4">Status de Inatividade</th>
-                                            <th className="text-right text-[10px] font-bold uppercase tracking-wider px-4 py-4">Frequência Média</th>
-                                            <th className="text-right text-[10px] font-bold uppercase tracking-wider px-4 py-4">Volume Médio / Compra</th>
-                                            <th className="text-center text-[10px] font-bold uppercase tracking-wider px-4 py-4">Última Compra</th>
-                                            <th className="text-center text-[10px] font-bold uppercase tracking-wider px-4 py-4">Próxima Prevista</th>
-                                            <th className="text-right text-[10px] font-bold uppercase tracking-wider px-6 py-4">Ação</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/5">
-                                        {filteredPredict.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={7} className="px-6 py-12 text-center text-slate-500 font-medium">Nenhum cliente atende a estes filtros de predição.</td>
-                                            </tr>
-                                        ) : (
-                                            filteredPredict.map((c, i) => {
-                                                // Badges estilizados baseados na inatividade
-                                                const getBadge = (status: ClientePredict['statusInatividade']) => {
-                                                    switch (status) {
-                                                        case 'ativo':
-                                                            return (
-                                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
-                                                                    <UserCheck className="w-3 h-3" />
-                                                                    No Prazo
-                                                                </span>
-                                                            );
-                                                        case '3m':
-                                                            return (
-                                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-yellow-500/10 text-yellow-400 border border-yellow-500/25 animate-pulse-slow">
-                                                                    <Clock className="w-3 h-3" />
-                                                                    +3 Meses Inativo
-                                                                </span>
-                                                            );
-                                                        case '6m':
-                                                            return (
-                                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-orange-500/10 text-orange-400 border border-orange-500/25 animate-pulse-slow">
-                                                                    <Clock className="w-3 h-3" />
-                                                                    +6 Meses Inativo
-                                                                </span>
-                                                            );
-                                                        case '9m':
-                                                            return (
-                                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-[#e05050]/10 text-[#f87171] border border-[#e05050]/25">
-                                                                    <Clock className="w-3 h-3" />
-                                                                    +9 Meses Inativo
-                                                                </span>
-                                                            );
-                                                        case '1a':
-                                                            return (
-                                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-red-600/15 text-red-400 border border-red-500/25">
-                                                                    <AlertTriangle className="w-3 h-3" />
-                                                                    +1 Ano Inativo
-                                                                </span>
-                                                            );
-                                                        case '2a+':
-                                                            return (
-                                                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-rose-950/20 text-rose-500 border border-rose-500/25">
-                                                                    <AlertTriangle className="w-3 h-3" />
-                                                                    +2 Anos Churn
-                                                                </span>
-                                                            );
-                                                    }
-                                                };
-
-                                                return (
-                                                    <tr key={i} className="hover:bg-white/5 transition-colors group">
-                                                        {/* Nome do cliente */}
-                                                        <td className="px-6 py-4 font-bold text-white max-w-[240px] truncate group-hover:text-[#f87171] transition-colors">{c.nome}</td>
-                                                        
-                                                        {/* Badge de inatividade */}
-                                                        <td className="px-4 py-4 text-center whitespace-nowrap">{getBadge(c.statusInatividade)}</td>
-                                                        
-                                                        {/* Frequência Média em Meses */}
-                                                        <td className="px-4 py-4 text-right text-slate-300 font-medium">
-                                                            {c.intervaloMedioMeses > 0 ? (
-                                                                <span>de {c.intervaloMedioMeses.toFixed(1)} em {c.intervaloMedioMeses.toFixed(1)} meses</span>
-                                                            ) : (
-                                                                <span className="text-slate-500 text-xs italic">Compra única</span>
-                                                            )}
-                                                        </td>
-                                                        
-                                                        {/* Volume Médio por Compra */}
-                                                        <td className="px-4 py-4 text-right text-emerald-400 font-bold">
-                                                            {formatCurrency(c.totalComprado / c.totalPedidos)}
-                                                        </td>
-                                                        
-                                                        {/* Data da Última Compra */}
-                                                        <td className="px-4 py-4 text-center text-slate-400 whitespace-nowrap">{formatDate(c.ultimaCompraDate)}</td>
-                                                        
-                                                        {/* Data Prevista de Re-compra */}
-                                                        <td className="px-4 py-4 text-center whitespace-nowrap">
-                                                            {c.proximaCompraEstimada ? (
-                                                                <span className={c.diasInatividade > (c.intervaloMedioMeses * 30.4) ? "text-rose-400/80 font-bold" : "text-emerald-400/80 font-bold"}>
-                                                                    {formatDate(c.proximaCompraEstimada)}
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-slate-600 text-xs italic">—</span>
-                                                            )}
-                                                        </td>
-                                                        
-                                                        {/* Ação: link inteligente para clientes tab=itens */}
-                                                        <td className="px-6 py-4 text-right whitespace-nowrap">
-                                                            <Link
-                                                                to={`/clientes?cliente=${encodeURIComponent(c.nome)}&tab=itens`}
-                                                                className="inline-flex items-center gap-1 bg-[#C01717]/10 hover:bg-[#C01717] text-[#f87171] hover:text-white border border-[#C01717]/25 hover:border-transparent rounded-lg px-3 py-1.5 text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
-                                                            >
-                                                                <span>Oportunidades</span>
-                                                                <ArrowRight className="w-3.5 h-3.5" />
-                                                            </Link>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })
-                                        )}
-                                    </tbody>
-                                </table>
+                    {/* Gráfico de Linhas Amplo de Histórico e Forecast */}
+                    <div className="card-premium p-6 bg-black/45 backdrop-blur-md shadow-2xl border border-white/10">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                            <div>
+                                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Histórico Consolidado & Tendência de Vendas</h3>
+                                <p className="text-xs text-slate-500 mt-0.5">Visão geral do faturamento dos últimos 6 meses com forecast relativo para {predictData.mesForecastLabel}.</p>
+                            </div>
+                            <div className="flex items-center gap-4 text-xs font-bold">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-0.5 bg-[#C01717] rounded inline-block" />
+                                    <span className="text-slate-300">Faturamento Real</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-0.5 border-t border-dashed border-amber-400 rounded inline-block" />
+                                    <span className="text-slate-300">Projeção Estimada</span>
+                                </div>
                             </div>
                         </div>
-                    )}
-                </div>
+                        <div className="h-64 sm:h-72 w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart
+                                    data={predictData.historicoGrafico}
+                                    margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                    <XAxis 
+                                        dataKey="mes" 
+                                        stroke="#64748b" 
+                                        fontSize={10} 
+                                        fontWeight="bold"
+                                        tickLine={false} 
+                                    />
+                                    <YAxis 
+                                        stroke="#64748b" 
+                                        fontSize={10} 
+                                        fontWeight="bold"
+                                        tickLine={false}
+                                        tickFormatter={(v) => `R$ ${(v / 1000)}k`}
+                                    />
+                                    <Tooltip 
+                                        content={({ active, payload }) => {
+                                            if (active && payload && payload.length) {
+                                                const data = payload[0].payload;
+                                                return (
+                                                    <div className="bg-[#151518]/95 border border-white/10 rounded-xl p-3 shadow-2xl backdrop-blur-md">
+                                                        <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1.5">{data.mes}</p>
+                                                        {data.real !== undefined && (
+                                                            <div className="flex items-center justify-between gap-4 text-xs mt-1">
+                                                                <span className="text-slate-400 font-bold flex items-center gap-1.5">
+                                                                    <span className="w-2 h-2 rounded-full bg-[#C01717]" />
+                                                                    Faturamento Real:
+                                                                </span>
+                                                                <span className="font-black text-white">{formatCurrency(data.real)}</span>
+                                                            </div>
+                                                        )}
+                                                        {data.forecast !== undefined && (
+                                                            <div className="flex items-center justify-between gap-4 text-xs mt-1">
+                                                                <span className="text-slate-400 font-bold flex items-center gap-1.5">
+                                                                    <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                                                                    Forecast Ponderado:
+                                                                </span>
+                                                                <span className="font-black text-amber-400">{formatCurrency(data.forecast)}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            }
+                                            return null;
+                                        }}
+                                    />
+                                    <Line 
+                                        type="monotone" 
+                                        dataKey="real" 
+                                        stroke="#C01717" 
+                                        strokeWidth={3} 
+                                        dot={{ r: 4, stroke: '#C01717', strokeWidth: 1, fill: '#0a0a0c' }}
+                                        activeDot={{ r: 6, stroke: '#C01717', strokeWidth: 2, fill: '#fff' }}
+                                        connectNulls={true}
+                                    />
+                                    <Line 
+                                        type="monotone" 
+                                        dataKey="forecast" 
+                                        stroke="#fbbf24" 
+                                        strokeWidth={2} 
+                                        strokeDasharray="5 5"
+                                        dot={{ r: 4, stroke: '#fbbf24', strokeWidth: 1, fill: '#0a0a0c' }}
+                                        activeDot={{ r: 6, stroke: '#fbbf24', strokeWidth: 2, fill: '#fff' }}
+                                        connectNulls={true}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Seção Inferior: Grid de Clientes e Contatos Críticos */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                        {/* Coluna Esquerda: Filtros e Tabela de Oportunidades */}
+                        <div className="lg:col-span-8 space-y-4">
+                            <div className="card-premium p-6 bg-black/45 backdrop-blur-md shadow-2xl border border-white/10 space-y-4">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div>
+                                        <h3 className="text-sm font-bold text-white uppercase tracking-wider">Clientes Potenciais de Compra</h3>
+                                        <p className="text-xs text-slate-500 mt-0.5">Lista inteligente baseada no ciclo médio e tempo de inatividade.</p>
+                                    </div>
+                                    <div className="relative w-full sm:max-w-xs group">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-[#e05050] transition-colors" />
+                                        <input
+                                            className="input pl-9 text-xs"
+                                            placeholder="Buscar por cliente no predict..."
+                                            value={searchPredict}
+                                            onChange={e => setSearchPredict(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Filtros de Inatividade */}
+                                <div className="flex flex-wrap gap-1 bg-white/5 border border-white/10 rounded-xl p-1 w-fit">
+                                    {([
+                                        { id: 'all', label: 'Todos' },
+                                        { id: 'ativo', label: 'Ciclo Ativo' },
+                                        { id: '3m', label: '+3 Meses' },
+                                        { id: '6m', label: '+6 Meses' },
+                                        { id: '9m', label: '+9 Meses' },
+                                        { id: '1a', label: '+1 Ano' },
+                                        { id: '2a+', label: '+2 Anos' }
+                                    ] as const).map(opt => (
+                                        <button
+                                            key={opt.id}
+                                            onClick={() => setFiltroInatividade(opt.id)}
+                                            className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
+                                                filtroInatividade === opt.id
+                                                    ? 'bg-white/15 text-white shadow'
+                                                    : 'text-slate-500 hover:text-slate-300'
+                                            }`}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Tabela Premium */}
+                                <div className="overflow-x-auto rounded-xl border border-white/5 bg-white/5">
+                                    <table className="w-full text-xs">
+                                        <thead className="bg-white/5 border-b border-white/10 text-slate-500">
+                                            <tr>
+                                                <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3">Cliente</th>
+                                                <th className="text-right text-[10px] font-bold uppercase tracking-wider px-2 py-3">Ciclo Médio</th>
+                                                <th className="text-right text-[10px] font-bold uppercase tracking-wider px-2 py-3">Inatividade</th>
+                                                <th className="text-center text-[10px] font-bold uppercase tracking-wider px-4 py-3">Probabilidade</th>
+                                                <th className="text-right text-[10px] font-bold uppercase tracking-wider px-4 py-3">Ação</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5">
+                                            {filteredPredict.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-medium">
+                                                        Nenhum cliente atende a estes filtros de predição.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                filteredPredict.map((c, i) => {
+                                                    // Determinar classes HSL sintonizadas para a probabilidade
+                                                    const getProbColor = (lbl: 'alta' | 'media' | 'baixa') => {
+                                                        if (lbl === 'alta') return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25';
+                                                        if (lbl === 'media') return 'bg-amber-500/10 text-amber-400 border-amber-500/25';
+                                                        return 'bg-rose-500/10 text-rose-400 border-rose-500/25';
+                                                    };
+
+                                                    return (
+                                                        <tr key={i} className="hover:bg-white/5 transition-colors group">
+                                                            <td className="px-4 py-3 whitespace-nowrap">
+                                                                <div className="font-bold text-white max-w-[200px] truncate group-hover:text-[#f87171] transition-colors" title={c.nome}>
+                                                                    {c.nome}
+                                                                </div>
+                                                                <div className="text-[9px] text-slate-500 font-semibold mt-0.5">
+                                                                    Última compra: {formatDate(c.ultimaCompraDate)}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-2 py-3 text-right text-slate-300 font-medium whitespace-nowrap">
+                                                                {c.cicloMedioMeses > 0 
+                                                                    ? `a cada ${c.cicloMedioMeses.toFixed(1)} meses` 
+                                                                    : 'Compra única'}
+                                                            </td>
+                                                            <td className="px-2 py-3 text-right whitespace-nowrap">
+                                                                <span className={`font-bold ${c.inatividadeMeses > c.cicloMedioMeses && c.cicloMedioMeses > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
+                                                                    {c.inatividadeMeses === 0 ? 'Ativo' : `${c.inatividadeMeses} ${c.inatividadeMeses === 1 ? 'mês' : 'meses'}`}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                                <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getProbColor(c.probabilidadeLabel)}`}>
+                                                                    <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                                                                    {c.probabilidade}% - {c.probabilidadeLabel}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right whitespace-nowrap">
+                                                                <Link
+                                                                    to={`/clientes?cliente=${encodeURIComponent(c.nome)}&tab=itens`}
+                                                                    className="inline-flex items-center gap-1 bg-[#C01717]/10 hover:bg-[#C01717] text-[#f87171] hover:text-white border border-[#C01717]/25 hover:border-transparent rounded-lg px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
+                                                                >
+                                                                    <span>Oportunidades</span>
+                                                                    <ArrowRight className="w-3 h-3" />
+                                                                </Link>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Coluna Direita: Widget Premium - Contatos Críticos */}
+                        <div className="lg:col-span-4 space-y-4">
+                            <div className="card-premium p-6 bg-black/45 backdrop-blur-md shadow-2xl border border-white/10 space-y-4 sticky top-4">
+                                <div className="border-b border-white/10 pb-3">
+                                    <h3 className="text-xs font-bold text-[#f87171] uppercase tracking-wider flex items-center gap-1.5">
+                                        <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+                                        Contatos Críticos do Mês
+                                    </h3>
+                                    <p className="text-[10px] text-slate-500 mt-0.5 leading-relaxed">
+                                        Clientes de alto ticket com compra iminente prevista. Ação recomendada imediata.
+                                    </p>
+                                </div>
+
+                                <div className="space-y-3">
+                                    {predictData.contatosQuentes.length === 0 ? (
+                                        <p className="text-xs text-slate-500 text-center py-6">Nenhum contato crítico pendente no momento.</p>
+                                    ) : (
+                                        predictData.contatosQuentes.map((c, i) => (
+                                            <div 
+                                                key={i} 
+                                                className="bg-white/5 border border-white/5 hover:border-[#C01717]/40 rounded-xl p-3.5 space-y-2.5 transition-all group"
+                                            >
+                                                <div className="flex items-start justify-between gap-3">
+                                                    <div className="space-y-0.5 max-w-[70%]">
+                                                        <h4 className="font-bold text-white text-xs truncate group-hover:text-[#f87171] transition-colors" title={c.nome}>
+                                                            {c.nome}
+                                                        </h4>
+                                                        <p className="text-[9px] text-slate-500 font-semibold">
+                                                            Última compra há {c.inatividadeMeses === 0 ? 'menos de 1 mês' : `${c.inatividadeMeses} ${c.inatividadeMeses === 1 ? 'mês' : 'meses'}`}
+                                                        </p>
+                                                    </div>
+                                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/25">
+                                                        {c.probabilidade}% Alta
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center justify-between text-[10px] pt-1.5 border-t border-white/5">
+                                                    <div>
+                                                        <span className="text-[9px] text-slate-500 block">Ticket Médio Mensal</span>
+                                                        <span className="font-black text-emerald-400">{formatCurrency(c.faturamentoMedioMensal)}</span>
+                                                    </div>
+                                                    <Link
+                                                        to={`/clientes?cliente=${encodeURIComponent(c.nome)}&tab=itens`}
+                                                        className="inline-flex items-center gap-1 bg-[#C01717] hover:bg-[#a81414] text-white rounded-lg px-2.5 py-1.5 text-[9px] font-black uppercase tracking-wider transition-all shadow-md shadow-[#C01717]/15"
+                                                    >
+                                                        <PhoneCall className="w-3 h-3" />
+                                                        <span>Acionar</span>
+                                                    </Link>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    </div>
+                )
             )}
         </div>
     );
