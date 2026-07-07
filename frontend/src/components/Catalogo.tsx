@@ -379,8 +379,34 @@ export default function Catalogo() {
                 supabase.from('catalogo_produtos').select('montadora').not('montadora', 'is', null).limit(10000),
                 supabase.from('catalogo_produtos').select('grupo').not('grupo', 'is', null).limit(10000),
             ]);
-            const uniq = (arr: string[]) => [...new Set(arr)].sort();
-            setMontadoras(uniq((m.data || []).map((r: any) => r.montadora).filter(Boolean)));
+            
+            const individualMontadoras = new Set<string>();
+            (m.data || []).forEach((r: any) => {
+                if (r.montadora) {
+                    const parts = r.montadora.split(/[\s,/;\-+]+/).map((s: string) => s.trim()).filter(Boolean);
+                    parts.forEach((part: string) => {
+                        const lower = part.toLowerCase();
+                        if (lower === 'motors') return; // ignora a palavra "motors" para evitar poluir o menu (ex: de "Kia Motors")
+                        
+                        let normalized = part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+                        if (lower === 'gm') {
+                            normalized = 'GM';
+                        } else if (lower === 'vw') {
+                            normalized = 'VW';
+                        } else if (lower === 'mwm') {
+                            normalized = 'MWM';
+                        } else if (lower === 'fpt') {
+                            normalized = 'FPT';
+                        } else if (lower === 'citroen' || lower === 'citroën') {
+                            normalized = 'Citroën';
+                        }
+                        individualMontadoras.add(normalized);
+                    });
+                }
+            });
+
+            const uniq = (arr: string[]) => [...new Set(arr)].sort((a, b) => a.localeCompare(b, 'pt', { sensitivity: 'base' }));
+            setMontadoras(uniq(Array.from(individualMontadoras)));
             setGrupos(uniq((g.data || []).map((r: any) => r.grupo).filter(Boolean)));
             setOptionsLoaded(true);
         }
@@ -408,7 +434,13 @@ export default function Catalogo() {
             
             if (filters.cod.trim())     query = query.ilike('cod', `%${filters.cod.trim()}%`);
             if (ref)                    query = query.or(`ref_metal_leve_sulloy.ilike.%${ref}%,ref_anel_kalled.ilike.%${ref}%`);
-            if (filters.montadora)      query = query.eq('montadora', filters.montadora);
+            if (filters.montadora) {
+                if (filters.montadora === 'Citroën') {
+                    query = query.or('montadora.ilike.%Citroën%,montadora.ilike.%Citroen%');
+                } else {
+                    query = query.ilike('montadora', `%${filters.montadora}%`);
+                }
+            }
             if (filters.veiculo.trim()) query = query.ilike('veiculo', `%${filters.veiculo.trim()}%`);
             if (filters.motor.trim())   query = query.ilike('motor', `%${filters.motor.trim()}%`);
             if (filters.grupo)          query = query.eq('grupo', filters.grupo);
