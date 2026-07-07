@@ -330,7 +330,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return {
                     id: c.id,
                     Cliente: c.nome, 'Razão Social': c.nome, Representante: c.representante?.nome ?? '',
-                    Status: c.editado_manualmente && c.status ? c.status : (diffMonths > 4 ? 'Inativo' : 'Ativo'),
+                    Status: c.editado_manualmente && c.status ? c.status : (diffMonths > 3 ? 'Inativo' : 'Ativo'),
                     Grupo: c.grupo ?? '',
                     Desconto: c.desconto ?? '', Pagamento: c.pagamento ?? '',
                     Prazo: c.prazo ?? '', 
@@ -382,7 +382,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.json({
                 id: data.id,
                 Cliente: data.nome, 'Razão Social': data.nome, Representante: (data.representante as any)?.nome ?? '',
-                Status: data.editado_manualmente && data.status ? data.status : (diffMonths > 4 ? 'Inativo' : 'Ativo'),
+                Status: data.editado_manualmente && data.status ? data.status : (diffMonths > 3 ? 'Inativo' : 'Ativo'),
                 Grupo: data.grupo ?? '',
                 Desconto: data.desconto ?? '', Pagamento: data.pagamento ?? '',
                 Prazo: data.prazo ?? '',
@@ -559,7 +559,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const status = c.editado_manualmente && c.status
                     ? c.status
                     : (ultimaCompra
-                        ? ((today.getTime() - new Date(`${ultimaCompra}T12:00:00Z`).getTime()) / (1000 * 60 * 60 * 24 * 30.44) <= 4 ? 'Ativo' : 'Inativo')
+                        ? ((today.getTime() - new Date(`${ultimaCompra}T12:00:00Z`).getTime()) / (1000 * 60 * 60 * 24 * 30.44) <= 3 ? 'Ativo' : 'Inativo')
                         : 'Inativo');
                 return { nome: c.nome, ultimaCompra, status };
             }));
@@ -900,7 +900,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         nome: cNome,
                         uf: repNome ? (repEstadoMap.get(normalize(repNome)) || null) : null,
                         status: 'Ativo',
-                        grupo: 'Importado Automatically',
+                        grupo: 'Importado Automaticamente',
                         desconto: null,
                         pagamento: null,
                         prazo: null,

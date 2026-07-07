@@ -5,6 +5,22 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { api, Cliente, ClienteVendasMes, ItensNaoComprados, formatCurrency, formatMonthLabel } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 
+function getStatusBadgeLabel(c: Cliente) {
+    const status = c.Status ?? '';
+    const isActive = status.toLowerCase() === 'ativo';
+    if (isActive) return 'Ativo';
+    
+    if (!c.ultimaCompra) return 'Inativo (Sem compras)';
+    
+    const today = new Date();
+    const lastDate = new Date(`${c.ultimaCompra}T12:00:00Z`);
+    const diffMs = today.getTime() - lastDate.getTime();
+    const diffMonths = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
+    
+    if (diffMonths <= 0) return 'Inativo (< 1 mês)';
+    return `Inativo (${diffMonths} ${diffMonths === 1 ? 'mês' : 'meses'})`;
+}
+
 function ChartTooltipContent({ active, payload, label }: any) {
     if (!active || !payload?.length) return null;
     return (
@@ -436,7 +452,7 @@ export default function Clientes() {
                                                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                                                     : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                                                     }`}>
-                                                    {isActive ? 'Ativo' : 'Inativo'}
+                                                    {getStatusBadgeLabel(c)}
                                                 </span>
                                             </div>
                                         </div>
@@ -467,7 +483,7 @@ export default function Clientes() {
                                             ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
                                             : 'bg-rose-500/10 text-rose-400 border-rose-500/20 shadow-[0_0_15px_rgba(244,63,94,0.2)]'
                                             }`}>
-                                            {selectedCliente.Status?.toLowerCase() === 'ativo' ? 'Cliente Ativo' : 'Cliente Inativo'}
+                                            {selectedCliente.Status?.toLowerCase() === 'ativo' ? 'Cliente Ativo' : `Cliente ${getStatusBadgeLabel(selectedCliente)}`}
                                         </span>
                                         {selectedCliente.editado_manualmente && (
                                             <span className="inline-flex items-center px-3 py-1 rounded-md text-[11px] font-bold uppercase tracking-wide border bg-amber-500/10 text-amber-400 border-amber-500/20 shadow-[0_0_15px_rgba(245,158,11,0.2)] animate-pulse-slow">
