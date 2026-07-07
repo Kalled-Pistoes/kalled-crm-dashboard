@@ -26,7 +26,6 @@ export interface Filters {
     grupo?: string;
 }
 
-// ... existing interfaces ... (they stay the same)
 export interface DashboardStats {
     totalVendas: number;
     totalClientes: number;
@@ -202,6 +201,19 @@ export const api = {
             if (!res.ok) throw new Error(`Erro ao atualizar cliente: ${res.statusText}`);
             return res.json();
         }) as Promise<Cliente>;
+    },
+    mergeClientes: (targetClientId: string, sourceClientIds: string[]) => {
+        return fetch(`${API_BASE}/api/clientes/merge`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...authHeader()
+            },
+            body: JSON.stringify({ targetClientId, sourceClientIds })
+        }).then(res => {
+            if (!res.ok) throw new Error(`Erro ao mesclar clientes: ${res.statusText}`);
+            return res.json();
+        }) as Promise<{ success: boolean }>;
     },
     getClienteVendasPorMes: (nome: string) => fetchJson<ClienteVendasMes[]>(`/api/clientes/${encodeURIComponent(nome)}/vendas-por-mes`),
     getClienteItensNaoComprados: (nome: string) => fetchJson<ItensNaoComprados>(`/api/clientes/${encodeURIComponent(nome)}/itens-nao-comprados`),

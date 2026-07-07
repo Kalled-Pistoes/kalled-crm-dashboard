@@ -330,7 +330,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 return {
                     id: c.id,
                     Cliente: c.nome, 'Razão Social': c.nome, Representante: c.representante?.nome ?? '',
-                    Status: diffMonths > 4 ? 'Inativo' : 'Ativo',
+                    Status: c.editado_manualmente && c.status ? c.status : (diffMonths > 4 ? 'Inativo' : 'Ativo'),
                     Grupo: c.grupo ?? '',
                     Desconto: c.desconto ?? '', Pagamento: c.pagamento ?? '',
                     Prazo: c.prazo ?? '', 
@@ -346,10 +346,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const user = requireAuth(req, res);
             if (!user) return;
             if (req.method !== 'PUT') return res.status(405).json({ error: 'Method not allowed' });
-            
+
             const id = s1;
             const { status, grupo, desconto, pagamento, prazo, representante_id } = req.body || {};
-            
+
             const updates = {
                 status: status || null,
                 grupo: grupo || null,
@@ -360,15 +360,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 editado_manualmente: true,
                 updated_at: new Date().toISOString()
             };
-            
+
             const { data, error } = await supabase.from('clientes')
                 .update(updates)
                 .eq('id', id)
                 .select('id, nome, status, grupo, desconto, pagamento, prazo, representante_id, editado_manualmente, representante:representante_id(nome)')
                 .single();
-                
+
             if (error) return res.status(500).json({ error: error.message });
-            
+
             // Retorna o cliente atualizado mapeado no mesmo formato da listagem
             const today = new Date();
             // Buscar última compra para retornar o status correto
@@ -382,7 +382,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.json({
                 id: data.id,
                 Cliente: data.nome, 'Razão Social': data.nome, Representante: (data.representante as any)?.nome ?? '',
-                Status: diffMonths > 4 ? 'Inativo' : 'Ativo',
+                Status: data.editado_manualmente && data.status ? data.status : (diffMonths > 4 ? 'Inativo' : 'Ativo'),
                 Grupo: data.grupo ?? '',
                 Desconto: data.desconto ?? '', Pagamento: data.pagamento ?? '',
                 Prazo: data.prazo ?? '',
@@ -390,6 +390,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 editado_manualmente: !!data.editado_manualmente,
                 ultimaCompra: ultimaCompra || undefined,
             });
+        }
+
+        // ── clientes/merge ──────────────────────────────────────────────────
+        if (s0 === 'clientes' && s1 === 'merge') {
+            const user = requireAuth(req, res);
+            if (!user) return;
+            if (!requireAdmin(user, res)) return;
+            
+            if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+            
+            const { targetClientId, sourceClientIds } = req.body || {};
+            if (!targetClientId || !sourceClientIds || !Array.isArray(sourceClientIds) || sourceClientIds.length === 0) {
+                return res.status(400).json({ error: 'targetClientId e sourceClientIds são obrigatórios.' });
+            }
+            
+            // 1. Move all vendas
+            const { error: errVendas } = await supabase.from('vendas')
+                .update({ cliente_id: targetClientId })
+                .in('cliente_id', sourceClientIds);
+            if (errVendas) return res.status(500).json({ error: `Erro ao mover vendas: ${errVendas.message}` });
+            
+            // Obter nome do cliente destino para os campos desnormalizados
+            const { data: targetClient } = await supabase.from('clientes')
+                .select('nome')
+                .eq('id', targetClientId)
+                .single();
+            const targetName = targetClient?.nome || null;
+            
+            // 2. Move all vendas_representantes
+            const { error: errVR } = await supabase.from('vendas_representantes')
+                .update({ cliente_id: targetClientId, cliente_nome: targetName })
+                .in('cliente_id', sourceClientIds);
+            if (errVR) return res.status(500).json({ error: `Erro ao mover vendas de representantes: ${errVR.message}` });
+            
+            // 3. Move all visitas_tecnicas
+            const { error: errVisitas } = await supabase.from('visitas_tecnicas')
+                .update({ cliente_id: targetClientId, cliente_nome: targetName })
+                .in('cliente_id', sourceClientIds);
+            if (errVisitas) return res.status(500).json({ error: `Erro ao mover visitas: ${errVisitas.message}` });
+            
+            // 4. Delete duplicated clients
+            const { error: errDelete } = await supabase.from('clientes')
+                .delete()
+                .in('id', sourceClientIds);
+            if (errDelete) return res.status(500).json({ error: `Erro ao deletar clientes duplicados: ${errDelete.message}` });
+            
+            return res.json({ success: true });
         }
 
         if (s0 === 'clientes' && s1 === 'top') {
@@ -495,7 +542,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 ? user.representante : decodeURIComponent(s1);
             const { data: rep } = await supabase.from('representantes').select('id').ilike('nome', nome).single();
             if (!rep) return res.json([]);
-            const { data: clientes } = await supabase.from('clientes').select('id, nome').eq('representante_id', rep.id);
+            const { data: clientes } = await supabase.from('clientes').select('id, nome, status, editado_manualmente').eq('representante_id', rep.id);
             if (!clientes?.length) return res.json([]);
             const cliIds = clientes.map(c => c.id);
             const vendas = await fetchAllPages(
@@ -509,9 +556,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const today = new Date();
             return res.json(clientes.map(c => {
                 const ultimaCompra = ultimaCompraMap[c.id] || null;
-                const status = ultimaCompra
-                    ? ((today.getTime() - new Date(`${ultimaCompra}T12:00:00Z`).getTime()) / (1000 * 60 * 60 * 24 * 30.44) <= 4 ? 'Ativo' : 'Inativo')
-                    : 'Inativo';
+                const status = c.editado_manualmente && c.status
+                    ? c.status
+                    : (ultimaCompra
+                        ? ((today.getTime() - new Date(`${ultimaCompra}T12:00:00Z`).getTime()) / (1000 * 60 * 60 * 24 * 30.44) <= 4 ? 'Ativo' : 'Inativo')
+                        : 'Inativo');
                 return { nome: c.nome, ultimaCompra, status };
             }));
         }
@@ -593,10 +642,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (error) return res.status(500).json({ error: error.message });
             return res.json((data || []).map((r: any) => ({
                 id: r.id,
-                data: r.data, 
+                data: r.data,
                 tipoVisita: r.tipo_visita || '',
                 responsavelVisita: r.responsavel_visita || '',
-                representante: r.representante?.nome ?? '', 
+                representante: r.representante?.nome ?? '',
                 cliente: r.cliente?.nome ?? r.cliente_nome ?? '',
                 status: r.status || '',
                 objetivosMetas: r.objetivos_metas || '',
@@ -672,7 +721,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             };
 
             // ── parse Excel ──────────────────────────────────────────────
-            // Problema: xlsx tem ZIP com "data descriptor" (compressedSize=0 no header local)
+            // Problema: xlsx tem ZIP com \"data descriptor\" (compressedSize=0 no header local)
             // E o EOCD está corrompido/ausente. Solução: varrer headers locais manualmente,
             // localizar o data descriptor real via verificação matemática e patchear o buffer.
             const readXlsx = async (b64: string): Promise<any> => {
@@ -725,7 +774,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     return XLSX.read(await clean.generateAsync({ type: 'uint8array' }), { type: 'array' });
                 } catch (e: any) { errFinal = e.message; }
 
-                throw new Error(`Não foi possível ler o arquivo Excel (${raw.length} bytes): ${errFinal}. Tente abrir no Excel e fazer "Salvar Como" para gerar uma cópia limpa.`);
+                throw new Error(`Não foi possível ler o arquivo Excel (${raw.length} bytes): ${errFinal}. Tente abrir no Excel e fazer \"Salvar Como\" para gerar uma cópia limpa.`);
             };
             // ── preview (não salva nada, apenas mostra o que foi lido) ───────
             if (s1 === 'preview') {
@@ -851,7 +900,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                         nome: cNome,
                         uf: repNome ? (repEstadoMap.get(normalize(repNome)) || null) : null,
                         status: 'Ativo',
-                        grupo: 'Importado Automaticamente',
+                        grupo: 'Importado Automatically',
                         desconto: null,
                         pagamento: null,
                         prazo: null,
@@ -895,13 +944,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const cliente = String(getVal(r,'Cliente','cliente')||'').trim();
                 const sku = String(getVal(r,'Código (SKU)','Codigo','codigo','PN','pn')||'').trim();
                 if (!data||!cliente) return null;
-                
+
                 const repNomeStr = clientToRepNameMap.get(cliente);
                 const repId = repNomeStr ? repMap.get(repNomeStr) : undefined;
-                
+
                 const clienteId = findCliId(cliente);
                 if (!clienteId) return null; // Fallback de segurança
-                
+
                 return { data, cliente_id: clienteId, produto_id: prodMap.get(sku)||null, quantidade: parseCurrency(getVal(r,'Quantidade','quantidade'))||null, valor: parseCurrency(getVal(r,'Valor','valor'))||null, representante_id: repId||null };
             }).filter(Boolean);
             vendasCount = await insertBatch('vendas', vendasRows as any[]);
@@ -912,16 +961,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const vendedor = String(getVal(r,'Vendedor','vendedor')||'').trim();
                 const cliente = String(getVal(r,'Cliente','cliente')||'').trim();
                 if (!data||!vendedor) return null;
-                
+
                 const clienteId = findCliId(cliente);
-                
-                return { 
-                    data, 
-                    representante_id: repMap.get(vendedor)||null, 
+
+                return {
+                    data,
+                    representante_id: repMap.get(vendedor)||null,
                     representante_nome: vendedor,
-                    cliente_id: clienteId, 
-                    cliente_nome: cliente||null, 
-                    valor_pedido: parseCurrency(getVal(r,'Valor do Pedido',' Valor do Pedido ','Valor','valor'))||null 
+                    cliente_id: clienteId,
+                    cliente_nome: cliente||null,
+                    valor_pedido: parseCurrency(getVal(r,'Valor do Pedido',' Valor do Pedido ','Valor','valor'))||null
                 };
             }).filter(Boolean);
             vrCount = await insertBatch('vendas_representantes', vrRows as any[]);
@@ -932,21 +981,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 const rep = String(getVal(r,'Representante','representante','Vendedor','vendedor')||'').trim();
                 const cliente = String(getVal(r,'Cliente','cliente')||'').trim();
                 if (!data||!rep) return null;
-                
+
                 const clienteId = findCliId(cliente);
-                
-                return { 
-                    data, 
-                    tipo_visita: String(getVal(r,'Tipo de Visita','tipo de visita')||'').trim()||null, 
+
+                return {
+                    data,
+                    tipo_visita: String(getVal(r,'Tipo de Visita','tipo de visita')||'').trim()||null,
                     responsavel_visita: String(getVal(r,'Responsável Pela Visita','Reponsável Pela Visita','responsável pela visita')||'').trim()||null,
-                    representante_id: repMap.get(rep)||null, 
+                    representante_id: repMap.get(rep)||null,
                     representante_nome: rep,
-                    cliente_id: clienteId, 
+                    cliente_id: clienteId,
                     cliente_nome: cliente || null,
                     status: String(getVal(r,'Status','status')||'').trim()||null,
                     objetivos_metas: String(getVal(r,'Objetivos e Metas','Obetivos e Metas','objetivos e metas')||'').trim()||null,
                     potencial_compra: parseCurrency(getVal(r,'Potencial Mensal de Compra','potencial mensal de compra'))||0,
-                    custo_visita: parseCurrency(getVal(r,'Custo da Visita (R$)','Custo da Visita','custo da visita (r$)','custo da visita'))||0 
+                    custo_visita: parseCurrency(getVal(r,'Custo da Visita (R$)','Custo da Visita','custo da visita (r$)','custo da visita'))||0
                 };
             }).filter(Boolean);
             visitasCount = await insertBatch('visitas_tecnicas', visitasRows as any[]);
@@ -962,7 +1011,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 // Normaliza chave de coluna: remove acentos, lowercase, trim
                 const normKey = (s: string) => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
 
-                // Auto-detecta range: tenta range:0 e range:1, usa o que tiver coluna "cod"
+                // Auto-detecta range: tenta range:0 e range:1, usa o que tiver coluna \"cod\"
                 const tryRange = (range: number): any[] => {
                     try { return XLSX.utils.sheet_to_json(sheetCat, { range, raw: false, defval: null }); }
                     catch { return []; }
@@ -981,7 +1030,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     return null;
                 };
 
-                // Normaliza para Title Case: "FORD" → "Ford", "volkswagen" → "Volkswagen"
+                // Normaliza para Title Case: \"FORD\" → \"Ford\", \"volkswagen\" → \"Volkswagen\"
                 const toTitleCase = (v: any): string | null => {
                     if (!v) return null;
                     const s = String(v).trim();

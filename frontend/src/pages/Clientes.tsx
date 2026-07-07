@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Search, Users, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api, Cliente, ClienteVendasMes, ItensNaoComprados, formatCurrency, formatMonthLabel } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 
 function ChartTooltipContent({ active, payload, label }: any) {
     if (!active || !payload?.length) return null;
@@ -24,6 +25,8 @@ export default function Clientes() {
     const [filtroStatus, setFiltroStatus] = useState('');
     const [ordem, setOrdem] = useState<'asc' | 'desc'>('asc');
 
+    const { isAdmin } = useAuth();
+
     // Novos estados para o modal e edição de clientes
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [repsList, setRepsList] = useState<{ id?: string; nome: string }[]>([]);
@@ -36,6 +39,12 @@ export default function Clientes() {
         representante_id: ''
     });
     const [updating, setUpdating] = useState(false);
+
+    // Estados para unificação (mesclar) de clientes
+    const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
+    const [mergeSearch, setMergeSearch] = useState('');
+    const [selectedDuplicates, setSelectedDuplicates] = useState<Cliente[]>([]);
+    const [merging, setMerging] = useState(false);
 
     useEffect(() => {
         api.getClientes()
@@ -248,6 +257,69 @@ export default function Clientes() {
         }
     };
 
+    const handleOpenMergeModal = () => {
+        setSelectedDuplicates([]);
+        setMergeSearch('');
+        setIsMergeModalOpen(true);
+    };
+
+    const mergeCandidates = useMemo(() => {
+        if (!selectedCliente) return [];
+        const q = mergeSearch.toLowerCase();
+        return clientes.filter(c => {
+            if (c.id === selectedCliente.id) return false;
+            if (selectedDuplicates.some(d => d.id === c.id)) return false;
+            const name = (c.Cliente ?? c['Razão Social'] ?? '').toLowerCase();
+            return !q || name.includes(q);
+        }).slice(0, 10);
+    }, [clientes, selectedCliente, mergeSearch, selectedDuplicates]);
+
+    const handleAddDuplicate = (c: Cliente) => {
+        setSelectedDuplicates(prev => [...prev, c]);
+        setMergeSearch('');
+    };
+
+    const handleRemoveDuplicate = (id: string) => {
+        setSelectedDuplicates(prev => prev.filter(c => c.id !== id));
+    };
+
+    const handleConfirmMerge = async () => {
+        if (!selectedCliente || !selectedCliente.id || selectedDuplicates.length === 0) return;
+        
+        const confirmMsg = `Tem certeza que deseja mesclar os ${selectedDuplicates.length} clientes selecionados em "${selectedCliente.Cliente}"?\n\nEsta ação moverá todo o histórico de vendas/visitas e excluirá os outros cadastros permanentemente.`;
+        if (!window.confirm(confirmMsg)) return;
+        
+        setMerging(true);
+        try {
+            await api.mergeClientes(selectedCliente.id, selectedDuplicates.map(d => d.id as string));
+            
+            // Remove localmente os clientes mesclados
+            const duplicateIds = selectedDuplicates.map(d => d.id);
+            setClientes(prev => prev.filter(c => !duplicateIds.includes(c.id)));
+            
+            // Limpa dados carregados do cliente para forçar recarga (já que agora ele tem novas vendas/visitas)
+            setClienteVendas([]);
+            setItensData(null);
+            
+            // Se estiver na aba historico ou itens, recarrega
+            const nome = selectedCliente.Cliente ?? selectedCliente['Razão Social'] ?? '';
+            if (activeTab === 'historico') {
+                setLoadingVendas(true);
+                api.getClienteVendasPorMes(nome).then(setClienteVendas).finally(() => setLoadingVendas(false));
+            } else if (activeTab === 'itens') {
+                setLoadingItens(true);
+                api.getClienteItensNaoComprados(nome).then(setItensData).finally(() => setLoadingItens(false));
+            }
+
+            alert('Clientes unificados com sucesso!');
+            setIsMergeModalOpen(false);
+        } catch (e: any) {
+            alert(`Erro ao unificar clientes: ${e.message}`);
+        } finally {
+            setMerging(false);
+        }
+    };
+
     if (loading) return (
         <div className="flex items-center justify-center h-64">
             <div className="w-8 h-8 border-2 border-[#C01717] border-t-transparent rounded-full animate-spin" />
@@ -408,7 +480,15 @@ export default function Clientes() {
                                     </h2>
                                     <p className="text-slate-400 text-sm font-medium truncate max-w-full">Documento Fiscal / Razão Social: {selectedCliente['Razão Social'] || selectedCliente.Cliente}</p>
                                 </div>
-                                <div className="flex-shrink-0">
+                                <div className="flex-shrink-0 flex gap-2">
+                                    {isAdmin && (
+                                        <button 
+                                            onClick={handleOpenMergeModal}
+                                            className="w-full md:w-auto bg-amber-500/10 hover:bg-amber-500/25 text-amber-400 hover:text-white border border-amber-500/30 hover:border-amber-500/55 rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 cursor-pointer shadow-lg flex items-center justify-center gap-1.5"
+                                        >
+                                            Unificar Cadastros
+                                        </button>
+                                    )}
                                     <button 
                                         onClick={handleOpenEditModal}
                                         className="w-full md:w-auto bg-[#C01717]/10 hover:bg-[#C01717]/25 text-[#e05050] hover:text-white border border-[#C01717]/30 hover:border-[#C01717]/55 rounded-xl px-4 py-2 text-xs font-bold transition-all duration-200 cursor-pointer shadow-lg shadow-[#C01717]/5 flex items-center justify-center gap-1.5"
@@ -562,7 +642,7 @@ export default function Clientes() {
                                                     <div className="flex items-center gap-2 flex-shrink-0">
                                                         <button 
                                                             onClick={exportToTXT}
-                                                            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-755 hover:text-white border border-slate-700/50 hover:border-slate-600 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-300 transition-all cursor-pointer"
+                                                            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-750 hover:text-white border border-slate-700/50 hover:border-slate-600 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-300 transition-all cursor-pointer"
                                                             title="Exportar como TXT formatado para enviar por WhatsApp ou Email"
                                                         >
                                                             <Download className="w-3.5 h-3.5 text-slate-400" />
@@ -578,7 +658,7 @@ export default function Clientes() {
                                                         </button>
                                                     </div>
                                                 </div>
- 
+                                                
                                                 {/* List */}
                                                 {(() => {
                                                     const visibles = itensData.naoComprados.filter(item => {
@@ -769,6 +849,111 @@ export default function Clientes() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Unificação (Mesclar) */}
+            {isMergeModalOpen && selectedCliente && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="w-full max-w-lg bg-[#111113] border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        {/* Modal Header */}
+                        <div className="px-6 py-4 border-b border-white/5 bg-white/5 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Unificar Cadastros</h3>
+                                <p className="text-xs text-amber-400 font-semibold mt-0.5">Destino: {selectedCliente.Cliente}</p>
+                            </div>
+                            <button 
+                                onClick={() => setIsMergeModalOpen(false)}
+                                className="text-slate-400 hover:text-white transition-colors cursor-pointer text-xs font-bold bg-white/5 px-2.5 py-1 rounded-md border border-white/10"
+                            >
+                                Fechar
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="p-6 space-y-4">
+                            <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 text-xs text-amber-400 space-y-1">
+                                <p className="font-bold uppercase tracking-wider">⚠️ Atenção</p>
+                                <p>Esta ação irá transferir permanentemente todas as vendas e visitas dos clientes duplicados selecionados para o cadastro de <strong>{selectedCliente.Cliente}</strong>.</p>
+                                <p>Após a conclusão, as contas duplicadas serão excluídas.</p>
+                            </div>
+
+                            {/* Duplicados Selecionados */}
+                            <div>
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Clientes Duplicados Selecionados ({selectedDuplicates.length})</label>
+                                {selectedDuplicates.length === 0 ? (
+                                    <p className="text-slate-500 text-xs italic">Nenhum cliente selecionado ainda. Busque-os abaixo.</p>
+                                ) : (
+                                    <div className="space-y-2 max-h-[120px] overflow-y-auto pr-1">
+                                        {selectedDuplicates.map(d => (
+                                            <div key={d.id} className="flex justify-between items-center bg-white/5 px-3 py-2 rounded-lg border border-white/5">
+                                                <div className="min-w-0">
+                                                    <p className="text-xs font-semibold text-slate-300 truncate">{d.Cliente}</p>
+                                                    <p className="text-[10px] text-slate-500 truncate">{d.Representante || 'Sem Representante'}</p>
+                                                </div>
+                                                <button
+                                                    onClick={() => handleRemoveDuplicate(d.id as string)}
+                                                    className="text-rose-400 hover:text-rose-300 text-xs font-bold px-2 py-1 cursor-pointer"
+                                                >
+                                                    Remover
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Busca de Duplicados */}
+                            <div className="space-y-2 relative">
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Buscar cadastros duplicados</label>
+                                <input
+                                    type="text"
+                                    className="input w-full"
+                                    placeholder="Digite o nome do duplicado..."
+                                    value={mergeSearch}
+                                    onChange={e => setMergeSearch(e.target.value)}
+                                />
+                                {mergeSearch.trim() && mergeCandidates.length > 0 && (
+                                    <div className="absolute left-0 right-0 mt-1 bg-[#18181b] border border-white/10 rounded-lg shadow-xl z-20 max-h-[160px] overflow-y-auto divide-y divide-white/5">
+                                        {mergeCandidates.map(c => (
+                                            <div
+                                                key={c.id}
+                                                onClick={() => handleAddDuplicate(c)}
+                                                className="p-3 cursor-pointer hover:bg-white/5 transition-colors text-left"
+                                            >
+                                                <p className="text-xs font-semibold text-slate-300">{c.Cliente}</p>
+                                                <p className="text-[10px] text-slate-500">{c.Representante || 'Sem Representante'}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                                {mergeSearch.trim() && mergeCandidates.length === 0 && (
+                                    <div className="absolute left-0 right-0 mt-1 bg-[#18181b] border border-white/10 rounded-lg p-3 text-xs text-slate-500 italic">
+                                        Nenhum candidato encontrado.
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Actions */}
+                            <div className="pt-4 border-t border-white/5 flex justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMergeModalOpen(false)}
+                                    className="px-4 py-2 rounded-xl border border-white/10 text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={merging || selectedDuplicates.length === 0}
+                                    onClick={handleConfirmMerge}
+                                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-black font-bold text-xs transition-all flex items-center gap-1.5"
+                                >
+                                    {merging ? 'Unificando...' : 'Confirmar Unificação'}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
