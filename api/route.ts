@@ -416,7 +416,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 .in('cliente_id', sourceClientIds);
             if (errVendas) return res.status(500).json({ error: `Erro ao mover vendas: ${errVendas.message}` });
             
-            // Obter nome do cliente destino para os campos desnormalizados
+            // Obter nomes dos clientes fonte e do destino para aliases e campos desnormalizados
+            const { data: sourceClients } = await supabase.from('clientes')
+                .select('id, nome')
+                .in('id', sourceClientIds);
             const { data: targetClient } = await supabase.from('clientes')
                 .select('nome')
                 .eq('id', targetClientId)
@@ -434,8 +437,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 .update({ cliente_id: targetClientId, cliente_nome: targetName })
                 .in('cliente_id', sourceClientIds);
             if (errVisitas) return res.status(500).json({ error: `Erro ao mover visitas: ${errVisitas.message}` });
-            
-            // 4. Delete duplicated clients
+
+            // 4. Salvar aliases ANTES de deletar (para proteger re-sincronização)
+            // Cada nome de cliente fonte vira um alias apontando para o cliente destino
+            if (sourceClients && sourceClients.length > 0) {
+                const aliasRows = sourceClients.map((c: any) => ({
+                    nome_origem: c.nome,
+                    cliente_id_destino: targetClientId,
+                }));
+                // upsert: se já existe um alias para esse nome, atualiza o destino
+                const { error: errAlias } = await supabase
+                    .from('clientes_aliases')
+                    .upsert(aliasRows, { onConflict: 'nome_origem' });
+                if (errAlias) return res.status(500).json({ error: `Erro ao salvar aliases: ${errAlias.message}` });
+            }
+
+            // 5. Marcar o cliente destino como editado_manualmente=true para proteger
+            // seus campos durante re-sincronização do Excel
+            await supabase.from('clientes')
+                .update({ editado_manualmente: true, updated_at: new Date().toISOString() })
+                .eq('id', targetClientId);
+
+            // 6. Delete duplicated clients
             const { error: errDelete } = await supabase.from('clientes')
                 .delete()
                 .in('id', sourceClientIds);
@@ -850,10 +873,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const { data: manualClients } = await supabase.from('clientes').select('nome').eq('editado_manualmente', true);
             const manualNamesSet = new Set((manualClients || []).map((c: any) => c.nome));
 
+            // Carrega aliases de clientes unificados: nome_origem → cliente_id_destino
+            // Isso garante que clientes deletados via "Unificar Cadastros" não sejam recriados
+            const { data: aliasesData } = await supabase.from('clientes_aliases').select('nome_origem, cliente_id_destino');
+            const aliasMap = new Map<string, string>(); // nome_origem → cliente_id_destino
+            for (const a of (aliasesData || [])) {
+                if (a.nome_origem && a.cliente_id_destino) aliasMap.set(a.nome_origem, a.cliente_id_destino);
+            }
+
             const cliRows = rawClientes.map((r:any) => {
                 const nome = String(getVal(r,'Cliente','cliente','Razão Social')||'').trim();
                 if (!nome) return null;
                 if (manualNamesSet.has(nome)) return null; // Ignora atualização do Excel se alterado via front-end
+                if (aliasMap.has(nome)) return null;        // Ignora clientes unificados (duplicados deletados)
 
                 const repNome = String(getVal(r,'Representante','representante')||'').trim();
                 return {
@@ -873,7 +905,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const normNome = (s:string) => s.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Z0-9]/g,' ').replace(/\s+/g,' ').trim();
             const cliMapNorm = new Map<string,string>();
             for (const [n,id] of cliMap) cliMapNorm.set(normNome(n), id);
-            const findCliId = (n:string) => cliMap.get(n) || cliMapNorm.get(normNome(n)) || null;
+            // findCliId: primeiro checa aliases (clientes unificados), depois o mapa normal
+            const findCliId = (n:string) => aliasMap.get(n) || cliMap.get(n) || cliMapNorm.get(normNome(n)) || null;
 
             // ── clientes faltantes nas vendas/visitas (Dynamic Registration) ─────
             const clientToRepNameMap = new Map<string, string>();
@@ -899,6 +932,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const missingClients: any[] = [];
             for (const cNome of uniqueClientsFromSales) {
+                // Pula clientes que são aliases (unificados): suas vendas serão redirecionadas
+                if (aliasMap.has(cNome)) continue;
                 if (!findCliId(cNome)) {
                     const repNome = clientToRepNameMap.get(cNome);
                     missingClients.push({
