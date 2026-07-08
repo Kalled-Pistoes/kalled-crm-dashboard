@@ -53,12 +53,17 @@ function calcularProbabilidadeRealista(
 
     if (mesesComCompra === 1 || cicloMeses <= 0) {
         const base = inatividadeMeses <= 1 ? 42 : inatividadeMeses <= 3 ? 28 : 12;
-        const percent = clamp(Math.round(base + Math.min(ticketMedio / 2500, 12)), 5, 55);
+        let percent = clamp(Math.round(base + Math.min(ticketMedio / 2500, 12)), 5, 55);
+        if (inatividadeMeses > 6) {
+            const decay = Math.exp(-(inatividadeMeses - 6) / 3);
+            percent = Math.round(percent * decay);
+        }
+        const finalPercent = clamp(percent, 0, 96);
         return {
-            percent,
-            label: percent >= 45 ? 'media' : 'baixa',
+            percent: finalPercent,
+            label: finalPercent >= 45 ? 'media' : 'baixa',
             atrasoMeses: 0,
-            acao: percent >= 45 ? 'monitorar' : 'observar',
+            acao: finalPercent >= 45 ? 'monitorar' : 'observar',
         };
     }
 
@@ -67,7 +72,17 @@ function calcularProbabilidadeRealista(
     const janelaCompra = 1 / (1 + Math.exp(-(atrasoMeses + 0.35) / Math.max(0.9, cicloNormalizado * 0.28)));
     const recenciaPenalty = inatividadeMeses > cicloMeses * 2.4 ? Math.min(35, (inatividadeMeses - cicloMeses * 2.4) * 3) : 0;
     const valorBoost = Math.min(10, Math.log10(Math.max(ticketMedio, 1)) * 2);
-    const percent = clamp(Math.round((janelaCompra * 74) + (consistenciaCiclo * 16) + valorBoost - recenciaPenalty), 5, 96);
+    let percent = clamp(Math.round((janelaCompra * 74) + (consistenciaCiclo * 16) + valorBoost - recenciaPenalty), 0, 96);
+
+    if (inatividadeMeses > 0) {
+        const limiteInatividade = Math.max(6, cicloMeses * 2.5);
+        if (inatividadeMeses > limiteInatividade) {
+            const excesso = inatividadeMeses - limiteInatividade;
+            const decay = Math.exp(-excesso / 4);
+            percent = Math.round(percent * decay);
+        }
+    }
+    percent = clamp(percent, 0, 96);
     const label = percent >= 70 ? 'alta' : percent >= 40 ? 'media' : 'baixa';
 
     let acao: ClientePredict['acaoRecomendada'] = 'observar';
@@ -441,8 +456,33 @@ export default function Vendas() {
             };
         });
 
-        // Somar forecast total do faturamento (soma das compras reais de Maio + a expectativa estocástica)
-        const forecastTotal = clientesCalculados.reduce((acc, c) => acc + c.valorForecast, 0);
+        // Calcular os três cenários de forecast de faturamento (bottom-up)
+        let forecastPessimista = 0;
+        let forecastMedio = 0;
+        let forecastOtimista = 0;
+
+        clientesCalculados.forEach(c => {
+            // Se o cliente já realizou compras no mês de forecast, esse valor real é fixado em todos os cenários
+            const jaComprou = c.ultimaCompraDate && c.ultimaCompraDate.substring(0, 7) === mesForecast;
+            if (jaComprou) {
+                forecastPessimista += c.valorForecast;
+                forecastMedio += c.valorForecast;
+                forecastOtimista += c.valorForecast;
+            } else {
+                // Cenário Pessimista: foca apenas em alta e média probabilidade com ajuste conservador
+                if (c.probabilidadeLabel === 'alta') {
+                    forecastPessimista += c.valorForecast * 0.85;
+                } else if (c.probabilidadeLabel === 'media') {
+                    forecastPessimista += c.valorForecast * 0.40;
+                }
+
+                // Cenário Médio (Plausível/Realista): usa o novo modelo estatístico com decaimento por inatividade
+                forecastMedio += c.valorForecast;
+
+                // Cenário Otimista: assume maior taxa de conversão e reativação (+35%)
+                forecastOtimista += c.valorForecast * 1.35;
+            }
+        });
 
         // Tradução e formatação
         const MESES_ABR = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -454,14 +494,11 @@ export default function Vendas() {
         };
 
         // Construir série histórica mensal com range DINÂMICO baseado no histórico real.
-        // Determina o primeiro mês com venda registrada, mostra até 24 meses antes do forecast.
         const primeiroMesGlobal = historicoVendas.length > 0
             ? historicoVendas.reduce((min, v) => v.data < min ? v.data : min, historicoVendas[0].data).substring(0, 7)
             : addMonths(mesForecast, -12);
 
-        // Calcula quantos meses desde o primeiro mês até o mês de forecast
         const totalMesesHistorico = diffInMonthsCivil(mesForecast, primeiroMesGlobal);
-        // Limita a 24 meses para legibilidade visual, mas usa o histórico completo se for menor
         const mesesExibir = Math.min(totalMesesHistorico, 24);
         const inicioGrafico = addMonths(mesForecast, -mesesExibir);
 
@@ -470,38 +507,42 @@ export default function Vendas() {
             mesesGrafico.push(addMonths(mesForecast, i));
         }
         mesesGrafico.push(mesForecast);
-        // Garante que o ponto de início seja no mínimo o primeiro mês com dados reais
         const mesesGraficoFiltrados = mesesGrafico.filter(m => m >= inicioGrafico);
 
         const historicoGrafico = mesesGraficoFiltrados.map(mes => {
-            // Soma faturamento real acumulado no mês (inclui compras já concretizadas em meses de forecast)
             const real = historicoVendas
                 .filter(v => v.data.startsWith(mes))
                 .reduce((acc, v) => acc + v.valor, 0);
 
-            let forecast: number | undefined = undefined;
+            let forecastPessimistaVal: number | undefined = undefined;
+            let forecastMedioVal: number | undefined = undefined;
+            let forecastOtimistaVal: number | undefined = undefined;
+
             if (mes === mesForecast) {
-                forecast = forecastTotal;
+                forecastPessimistaVal = forecastPessimista;
+                forecastMedioVal = forecastMedio;
+                forecastOtimistaVal = forecastOtimista;
             } else if (mes === ultimoConsolidado) {
-                // Conecta a linha pontilhada ao último ponto real consolidado
-                forecast = real;
+                // Conecta o final do gráfico real ao início de cada linha de forecast
+                forecastPessimistaVal = real;
+                forecastMedioVal = real;
+                forecastOtimistaVal = real;
             }
 
             return {
                 mes: formatMesAno(mes),
                 real: real > 0 || mes !== mesForecast ? real : undefined,
-                forecast
+                forecastPessimista: forecastPessimistaVal,
+                forecastMedio: forecastMedioVal,
+                forecastOtimista: forecastOtimistaVal
             };
         });
 
-        // Clientes quentes recomendados para contato (Alta probabilidade e maior faturamento previsto)
-        // Filtrar apenas aqueles que ainda NÃO compraram em Maio e têm probabilidade alta
         const contatosQuentes = clientesCalculados
             .filter(c => c.acaoRecomendada === 'acionar' && c.inatividadeMeses > 0)
             .sort((a, b) => b.prioridadeScore - a.prioridadeScore)
             .slice(0, 5);
 
-        // Frequência média geral dos clientes regulares (com compras recorrentes)
         const clientesRecorrentes = clientesCalculados.filter(c => c.cicloMedioMeses > 0);
         const frequenciaMediaGeral = clientesRecorrentes.length > 0
             ? (clientesRecorrentes.reduce((acc, c) => acc + c.cicloMedioMeses, 0) / clientesRecorrentes.length)
@@ -509,7 +550,10 @@ export default function Vendas() {
 
         return {
             clientes: clientesCalculados,
-            forecastTotal,
+            forecastTotal: forecastMedio,
+            forecastPessimista,
+            forecastMedio,
+            forecastOtimista,
             historicoGrafico,
             contatosQuentes,
             ultimoMesConsolidadoLabel: formatMesAno(ultimoConsolidado),
@@ -908,13 +952,24 @@ export default function Vendas() {
                     {/* Seção Superior: KPIs e Gráfico Amplo */}
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                         {/* Card 1: Faturamento Estimado */}
-                        <div className="card-premium py-4 px-5 border-l-4 border-emerald-500 bg-black/45 backdrop-blur-md shadow-2xl">
-                            <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Faturamento Estimado ({predictData.mesForecastLabel})</span>
-                                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                        <div className="card-premium py-4 px-5 border-l-4 border-emerald-500 bg-black/45 backdrop-blur-md shadow-2xl flex flex-col justify-between min-h-[115px]">
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Faturamento Estimado ({predictData.mesForecastLabel})</span>
+                                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+                                </div>
+                                <p className="text-2xl font-black text-emerald-400">{formatCurrency(predictData.forecastMedio)}</p>
                             </div>
-                            <p className="text-2xl font-black text-emerald-400">{formatCurrency(predictResumo.pipelinePonderado)}</p>
-                            <p className="text-xs text-slate-500 mt-1 font-medium">Pipeline ponderado por ciclo real e confiança.</p>
+                            <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-white/5 text-[9px] font-bold text-slate-400">
+                                <div>
+                                    <span className="text-[8px] uppercase text-slate-500 block">Pessimista</span>
+                                    <span className="text-rose-400">{formatCurrency(predictData.forecastPessimista)}</span>
+                                </div>
+                                <div className="text-right">
+                                    <span className="text-[8px] uppercase text-slate-500 block">Otimista</span>
+                                    <span className="text-emerald-400">{formatCurrency(predictData.forecastOtimista)}</span>
+                                </div>
+                            </div>
                         </div>
 
                         {/* Card 2: Ação Imediata */}
@@ -959,14 +1014,22 @@ export default function Vendas() {
                                 <h3 className="text-sm font-bold text-white uppercase tracking-wider">Histórico Consolidado & Tendência de Vendas</h3>
                                 <p className="text-xs text-slate-500 mt-0.5">Visão geral do faturamento dos últimos 6 meses com forecast relativo para {predictData.mesForecastLabel}.</p>
                             </div>
-                            <div className="flex items-center gap-4 text-xs font-bold">
+                            <div className="flex flex-wrap items-center gap-4 text-xs font-bold">
                                 <div className="flex items-center gap-1.5">
                                     <span className="w-3 h-0.5 bg-[#C01717] rounded inline-block" />
                                     <span className="text-slate-300">Faturamento Real</span>
                                 </div>
                                 <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-0.5 border-t border-dashed border-emerald-500 rounded inline-block" />
+                                    <span className="text-[#10b981]">Cenário Otimista</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
                                     <span className="w-3 h-0.5 border-t border-dashed border-amber-400 rounded inline-block" />
-                                    <span className="text-slate-300">Projeção Estimada</span>
+                                    <span className="text-amber-400">Cenário Médio</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <span className="w-3 h-0.5 border-t border-dashed border-rose-500 rounded inline-block" />
+                                    <span className="text-rose-400">Cenário Pessimista</span>
                                 </div>
                             </div>
                         </div>
@@ -1007,13 +1070,31 @@ export default function Vendas() {
                                                                 <span className="font-black text-white">{formatCurrency(data.real)}</span>
                                                             </div>
                                                         )}
-                                                        {data.forecast !== undefined && (
+                                                        {data.forecastOtimista !== undefined && (
+                                                            <div className="flex items-center justify-between gap-4 text-xs mt-1">
+                                                                <span className="text-slate-400 font-bold flex items-center gap-1.5">
+                                                                    <span className="w-2 h-2 rounded-full bg-[#10b981] animate-pulse" />
+                                                                    Cenário Otimista:
+                                                                </span>
+                                                                <span className="font-black text-[#10b981]">{formatCurrency(data.forecastOtimista)}</span>
+                                                            </div>
+                                                        )}
+                                                        {data.forecastMedio !== undefined && (
                                                             <div className="flex items-center justify-between gap-4 text-xs mt-1">
                                                                 <span className="text-slate-400 font-bold flex items-center gap-1.5">
                                                                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                                                                    Forecast Ponderado:
+                                                                    Cenário Médio:
                                                                 </span>
-                                                                <span className="font-black text-amber-400">{formatCurrency(data.forecast)}</span>
+                                                                <span className="font-black text-amber-400">{formatCurrency(data.forecastMedio)}</span>
+                                                            </div>
+                                                        )}
+                                                        {data.forecastPessimista !== undefined && (
+                                                            <div className="flex items-center justify-between gap-4 text-xs mt-1">
+                                                                <span className="text-slate-400 font-bold flex items-center gap-1.5">
+                                                                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                                                                    Cenário Pessimista:
+                                                                </span>
+                                                                <span className="font-black text-rose-400">{formatCurrency(data.forecastPessimista)}</span>
                                                             </div>
                                                         )}
                                                     </div>
@@ -1033,12 +1114,32 @@ export default function Vendas() {
                                     />
                                     <Line 
                                         type="monotone" 
-                                        dataKey="forecast" 
+                                        dataKey="forecastOtimista" 
+                                        stroke="#10b981" 
+                                        strokeWidth={2} 
+                                        strokeDasharray="5 5"
+                                        dot={{ r: 4, stroke: '#10b981', strokeWidth: 1, fill: '#0a0a0c' }}
+                                        activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2, fill: '#fff' }}
+                                        connectNulls={true}
+                                    />
+                                    <Line 
+                                        type="monotone" 
+                                        dataKey="forecastMedio" 
                                         stroke="#fbbf24" 
                                         strokeWidth={2} 
                                         strokeDasharray="5 5"
                                         dot={{ r: 4, stroke: '#fbbf24', strokeWidth: 1, fill: '#0a0a0c' }}
                                         activeDot={{ r: 6, stroke: '#fbbf24', strokeWidth: 2, fill: '#fff' }}
+                                        connectNulls={true}
+                                    />
+                                    <Line 
+                                        type="monotone" 
+                                        dataKey="forecastPessimista" 
+                                        stroke="#f43f5e" 
+                                        strokeWidth={2} 
+                                        strokeDasharray="5 5"
+                                        dot={{ r: 4, stroke: '#f43f5e', strokeWidth: 1, fill: '#0a0a0c' }}
+                                        activeDot={{ r: 6, stroke: '#f43f5e', strokeWidth: 2, fill: '#fff' }}
                                         connectNulls={true}
                                     />
                                 </LineChart>
@@ -1155,7 +1256,7 @@ export default function Vendas() {
                                     </label>
                                 </div>
 
-                                {/* Tabela Premium */}
+                                 {/* Tabela Premium */}
                                 <div className="overflow-x-auto rounded-xl border border-white/5 bg-white/5">
                                     <table className="w-full text-xs">
                                         <thead className="bg-white/5 border-b border-white/10 text-slate-500">
@@ -1163,6 +1264,7 @@ export default function Vendas() {
                                                 <th className="text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3">Cliente</th>
                                                 <th className="text-right text-[10px] font-bold uppercase tracking-wider px-2 py-3">Ciclo Médio</th>
                                                 <th className="text-right text-[10px] font-bold uppercase tracking-wider px-2 py-3">Inatividade</th>
+                                                <th className="text-right text-[10px] font-bold uppercase tracking-wider px-3 py-3">Valor Previsto</th>
                                                 <th className="text-center text-[10px] font-bold uppercase tracking-wider px-4 py-3">Probabilidade</th>
                                                 <th className="text-center text-[10px] font-bold uppercase tracking-wider px-3 py-3">Ação Sugerida</th>
                                                 <th className="text-right text-[10px] font-bold uppercase tracking-wider px-4 py-3">Ação</th>
@@ -1171,7 +1273,7 @@ export default function Vendas() {
                                         <tbody className="divide-y divide-white/5">
                                             {filteredPredict.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500 font-medium">
+                                                    <td colSpan={7} className="px-6 py-12 text-center text-slate-500 font-medium">
                                                         Nenhum cliente atende a estes filtros de predição.
                                                     </td>
                                                 </tr>
@@ -1218,6 +1320,14 @@ export default function Vendas() {
                                                                 <div className="text-[9px] text-slate-600 mt-0.5">
                                                                     {c.proximaCompraMes ? `Prev. ${c.proximaCompraMes}` : 'Sem ciclo'}
                                                                 </div>
+                                                            </td>
+                                                            <td className="px-3 py-3 text-right whitespace-nowrap">
+                                                                <span className="font-bold text-white block">
+                                                                    {c.valorForecast > 0 ? formatCurrency(c.valorForecast) : '—'}
+                                                                </span>
+                                                                <span className="text-[9px] text-slate-500 block">
+                                                                    Média: {formatCurrency(c.faturamentoMedioMensal)}
+                                                                </span>
                                                             </td>
                                                             <td className="px-4 py-3 text-center whitespace-nowrap">
                                                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getProbColor(c.probabilidadeLabel)}`}>
