@@ -536,29 +536,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 ultimoPedido: null,
             });
 
-            const pedidos = await fetchAllPages(
-                supabase.from('vendas_representantes')
-                    .select('data, valor_pedido')
+            // Usa a mesma fonte de dados do gráfico (tabela 'vendas') para garantir
+            // consistência entre o Resumo de Pedidos e o Histórico de Compras.
+            // Cada mês distinto com compras é tratado como um "pedido".
+            const todasVendas = await fetchAllPages(
+                supabase.from('vendas')
+                    .select('data, valor')
                     .eq('cliente_id', cli.id)
             );
 
-            const valores = pedidos
-                .map((p: any) => Number(p.valor_pedido || 0))
-                .filter((v: number) => v > 0);
-            const datas = pedidos
-                .map((p: any) => String(p.data || ''))
-                .filter(Boolean)
-                .sort();
-            const faturamentoTotal = valores.reduce((sum: number, value: number) => sum + value, 0);
-            const totalPedidos = pedidos.length;
+            // Agrupa por mês (YYYY-MM) para calcular total por período
+            const porMes: Record<string, number> = {};
+            let primeiroPedido: string | null = null;
+            let ultimoPedido: string | null = null;
+
+            for (const v of todasVendas) {
+                const dataStr = String(v.data || '');
+                if (!dataStr) continue;
+                const mes = toYearMonth(dataStr);
+                if (mes) porMes[mes] = (porMes[mes] || 0) + (v.valor || 0);
+                if (!primeiroPedido || dataStr < primeiroPedido) primeiroPedido = dataStr;
+                if (!ultimoPedido || dataStr > ultimoPedido) ultimoPedido = dataStr;
+            }
+
+            const totaisPorMes = Object.values(porMes);
+            const faturamentoTotal = totaisPorMes.reduce((sum, v) => sum + v, 0);
+            const totalPedidos = totaisPorMes.length; // nº de meses com compras
+            const maiorPedido = totaisPorMes.length > 0 ? Math.max(...totaisPorMes) : 0;
 
             return res.json({
                 totalPedidos,
                 valorMedioPedido: totalPedidos > 0 ? faturamentoTotal / totalPedidos : 0,
-                maiorPedido: valores.length > 0 ? Math.max(...valores) : 0,
+                maiorPedido,
                 faturamentoTotal,
-                primeiroPedido: datas[0] || null,
-                ultimoPedido: datas[datas.length - 1] || null,
+                primeiroPedido,
+                ultimoPedido,
             });
         }
 
