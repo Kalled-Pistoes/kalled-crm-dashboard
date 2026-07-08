@@ -350,14 +350,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const id = s1;
             const { status, grupo, desconto, pagamento, prazo, representante_id } = req.body || {};
             
+            const statusValue = status || null;
             const updates = {
-                status: status || null,
+                status: statusValue,
                 grupo: grupo || null,
                 desconto: desconto || null,
                 pagamento: pagamento || null,
                 prazo: prazo || null,
                 representante_id: representante_id || null,
-                editado_manualmente: true,
+                // editado_manualmente só fica true se o usuário definiu um status manual.
+                // Se status for null (automático), resetamos editado_manualmente para false
+                // para não travar futuras recalculações automáticas.
+                editado_manualmente: statusValue ? true : false,
                 updated_at: new Date().toISOString()
             };
             
