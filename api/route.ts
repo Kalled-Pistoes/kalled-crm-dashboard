@@ -12,6 +12,36 @@ export const config = {
     maxDuration: 60,
 };
 
+function normalizeLabel(value: string): string {
+    return value
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+}
+
+function diffCalendarMonthsSince(dateStr?: string | null, today = new Date()): number {
+    if (!dateStr) return Infinity;
+    const [year, month, day] = dateStr.split('-').map(Number);
+    if (!year || !month || !day) return Infinity;
+
+    const current = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate(), 12));
+    const last = new Date(Date.UTC(year, month - 1, day, 12));
+    let months = (current.getUTCFullYear() - last.getUTCFullYear()) * 12
+        + (current.getUTCMonth() - last.getUTCMonth());
+    if (current.getUTCDate() < last.getUTCDate()) months -= 1;
+    return Math.max(0, months);
+}
+
+function getAutoClientStatus(ultimaCompra?: string | null): 'Ativo' | 'Inativo' {
+    return diffCalendarMonthsSince(ultimaCompra) > 3 ? 'Inativo' : 'Ativo';
+}
+
+function getRelatedClienteNome(row: any): string {
+    return String(row?.cliente?.nome || row?.cliente_nome || '').trim();
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Parse path from URL: /api/auth/login → ['auth', 'login']
     const rawPath = (req.url || '').split('?')[0].replace(/^\/api\//, '').replace(/^\/api$/, '');
@@ -320,16 +350,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     ultimaCompraMap[u.cliente_id] = u.ultima_compra;
                 }
             }
-            const today = new Date();
             return res.json((clientes || []).map((c: any) => {
                 const ultimaCompra = ultimaCompraMap[c.id];
-                const diffMonths = ultimaCompra
-                    ? (today.getTime() - new Date(`${ultimaCompra}T12:00:00Z`).getTime()) / (1000 * 60 * 60 * 24 * 30.44)
-                    : Infinity;
                 return {
                     id: c.id,
                     Cliente: c.nome, 'Razão Social': c.nome, Representante: c.representante?.nome ?? '',
-                    Status: c.editado_manualmente && c.status ? c.status : (diffMonths > 3 ? 'Inativo' : 'Ativo'),
+                    Status: c.editado_manualmente && c.status ? c.status : getAutoClientStatus(ultimaCompra),
                     Grupo: c.grupo ?? '',
                     Desconto: c.desconto ?? '', Pagamento: c.pagamento ?? '',
                     Prazo: c.prazo ?? '', 
@@ -374,19 +400,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             if (error) return res.status(500).json({ error: error.message });
             
             // Retorna o cliente atualizado mapeado no mesmo formato da listagem
-            const today = new Date();
             // Buscar última compra para retornar o status correto
             let qVendas: any = supabase.from('vendas').select('data').eq('cliente_id', id).order('data', { ascending: false }).limit(1);
             const { data: vendasRec } = await qVendas;
             const ultimaCompra = vendasRec?.[0]?.data || undefined;
-            const diffMonths = ultimaCompra
-                ? (today.getTime() - new Date(`${ultimaCompra}T12:00:00Z`).getTime()) / (1000 * 60 * 60 * 24 * 30.44)
-                : Infinity;
-
             return res.json({
                 id: data.id,
                 Cliente: data.nome, 'Razão Social': data.nome, Representante: (data.representante as any)?.nome ?? '',
-                Status: data.editado_manualmente && data.status ? data.status : (diffMonths > 3 ? 'Inativo' : 'Ativo'),
+                Status: data.editado_manualmente && data.status ? data.status : getAutoClientStatus(ultimaCompra),
                 Grupo: data.grupo ?? '',
                 Desconto: data.desconto ?? '', Pagamento: data.pagamento ?? '',
                 Prazo: data.prazo ?? '',
@@ -542,10 +563,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 ? user.representante : decodeURIComponent(s1);
             const { data: rep } = await supabase.from('representantes').select('id').ilike('nome', nome).single();
             if (!rep) return res.json([]);
+            const clienteFiltro = normalizeLabel(String(req.query.cliente || ''));
             const data = await fetchAllPages(
-                supabase.from('vendas_representantes').select('data, valor_pedido').eq('representante_id', rep.id)
+                supabase.from('vendas_representantes')
+                    .select('data, valor_pedido, cliente_nome, cliente:cliente_id(nome)')
+                    .eq('representante_id', rep.id)
             );
-            const map = groupBySum(data, (r: any) => toYearMonth(r.data), (r: any) => r.valor_pedido || 0);
+            const rows = clienteFiltro
+                ? data.filter((r: any) => normalizeLabel(getRelatedClienteNome(r)) === clienteFiltro)
+                : data;
+            const map = groupBySum(rows, (r: any) => toYearMonth(r.data), (r: any) => r.valor_pedido || 0);
             return res.json(Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([mes, total]) => ({ mes, total })));
         }
 
@@ -556,10 +583,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 ? user.representante : decodeURIComponent(s1);
             const { data: rep } = await supabase.from('representantes').select('id').ilike('nome', nome).single();
             if (!rep) return res.json([]);
-            const { data, error } = await supabase.from('visitas_tecnicas').select('data, custo_visita')
+            const clienteFiltro = normalizeLabel(String(req.query.cliente || ''));
+            const { data, error } = await supabase.from('visitas_tecnicas').select('data, custo_visita, cliente_nome, cliente:cliente_id(nome)')
                 .eq('representante_id', rep.id).limit(10000);
             if (error) return res.status(500).json({ error: error.message });
-            const map = groupBySum(data || [], (r: any) => toYearMonth(r.data), (r: any) => r.custo_visita || 0);
+            const rows = clienteFiltro
+                ? (data || []).filter((r: any) => normalizeLabel(getRelatedClienteNome(r)) === clienteFiltro)
+                : (data || []);
+            const map = groupBySum(rows, (r: any) => toYearMonth(r.data), (r: any) => r.custo_visita || 0);
             return res.json(Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([mes, custo]) => ({ mes, custo })));
         }
 
@@ -581,14 +612,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                     ultimaCompraMap[u.cliente_id] = u.ultima_compra;
                 }
             }
-            const today = new Date();
             return res.json(clientes.map(c => {
                 const ultimaCompra = ultimaCompraMap[c.id] || null;
                 const status = c.editado_manualmente && c.status
                     ? c.status
-                    : (ultimaCompra
-                        ? ((today.getTime() - new Date(`${ultimaCompra}T12:00:00Z`).getTime()) / (1000 * 60 * 60 * 24 * 30.44) <= 3 ? 'Ativo' : 'Inativo')
-                        : 'Inativo');
+                    : getAutoClientStatus(ultimaCompra);
                 return { nome: c.nome, ultimaCompra, status };
             }));
         }
@@ -634,6 +662,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             })));
         }
 
+        if (s0 === 'representantes' && s1 && s2 === 'clientes-periodo') {
+            const user = requireAuth(req, res);
+            if (!user) return;
+            const nome = user.role === 'representante' && user.representante
+                ? user.representante : decodeURIComponent(s1);
+            const { data: rep } = await supabase.from('representantes').select('id').ilike('nome', nome).single();
+            if (!rep) return res.json([]);
+
+            const mesRaw = String(req.query.mes || '');
+            const anoRaw = String(req.query.ano || '');
+            const data = await fetchAllPages(
+                supabase.from('vendas_representantes')
+                    .select('data, cliente_nome, cliente:cliente_id(nome)')
+                    .eq('representante_id', (rep as any).id)
+            );
+
+            const nomes = new Map<string, string>();
+            for (const r of data) {
+                const dataVenda = String((r as any).data || '');
+                if (mesRaw && toYearMonth(dataVenda) !== mesRaw) continue;
+                if (!mesRaw && anoRaw && dataVenda.substring(0, 4) !== anoRaw) continue;
+
+                const cliente = getRelatedClienteNome(r);
+                const key = normalizeLabel(cliente);
+                if (cliente && key) nomes.set(key, cliente);
+            }
+
+            return res.json(Array.from(nomes.values()).sort((a, b) => a.localeCompare(b, 'pt-BR')));
+        }
+
         if (s0 === 'representantes' && s1 && s2 === 'visitas-por-cliente') {
             const user = requireAuth(req, res);
             if (!user) return;
@@ -642,12 +700,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const { data: rep } = await supabase.from('representantes').select('id').ilike('nome', nome).single();
             if (!rep) return res.json([]);
             const { data, error } = await supabase.from('visitas_tecnicas')
-                .select('data, custo_visita, cliente:cliente_id(nome)')
+                .select('data, custo_visita, cliente_nome, cliente:cliente_id(nome)')
                 .eq('representante_id', (rep as any).id).limit(10000);
             if (error) return res.status(500).json({ error: error.message });
+            const clienteFiltro = normalizeLabel(String(req.query.cliente || ''));
             const map: Record<string, { custo: number; ultimaVisita: string }> = {};
             for (const v of (data || [])) {
-                const cli = (v.cliente as any)?.nome || '';
+                const cli = getRelatedClienteNome(v);
+                if (clienteFiltro && normalizeLabel(cli) !== clienteFiltro) continue;
                 if (!cli) continue;
                 if (!map[cli]) map[cli] = { custo: 0, ultimaVisita: '' };
                 map[cli].custo += v.custo_visita || 0;

@@ -1,15 +1,16 @@
 ﻿import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ChevronDown, Users, TrendingUp, Target, DollarSign, Calendar, X } from 'lucide-react';
+import { Activity, ChevronDown, DollarSign, Filter, ShoppingCart, Target, TrendingUp, Users, Calendar, X } from 'lucide-react';
 import {
     BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
-    Tooltip, ResponsiveContainer, ReferenceLine, LabelList,
+    Tooltip, ResponsiveContainer, ReferenceLine, LabelList, Cell,
 } from 'recharts';
 import {
     api, Representante, ClienteVendasMes, RepVisitasMes,
     RepresentanteCliente, RepresentanteVisitaCliente, ComparativoAnoData,
     formatCurrency, formatDate, formatMonthLabel,
 } from '../lib/api';
+import { getStatusBadgeLabel, normalizeClientName } from '../lib/clientStatus';
 
 const MESES_FULL = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -62,6 +63,7 @@ export default function Representantes() {
     const [comparativoData, setComparativoData] = useState<ComparativoAnoData[]>([]);
     const [loadingComparativo, setLoadingComparativo] = useState(false);
     const [selectedPeriodo, setSelectedPeriodo] = useState<{ type: 'mes' | 'ano'; value: string } | null>(null);
+    const [selectedClienteNome, setSelectedClienteNome] = useState('');
     const [clientesAtivos, setClientesAtivos] = useState<Set<string>>(new Set());
     const [loadingPeriodo, setLoadingPeriodo] = useState(false);
 
@@ -79,11 +81,12 @@ export default function Representantes() {
     useEffect(() => {
         if (!selectedRep) return;
         setLoadingDetail(true);
+        const params = selectedClienteNome ? { cliente: selectedClienteNome } : undefined;
         Promise.all([
-            api.getRepresentanteVendasPorMes(selectedRep),
-            api.getRepresentanteVisitasPorMes(selectedRep),
+            api.getRepresentanteVendasPorMes(selectedRep, params),
+            api.getRepresentanteVisitasPorMes(selectedRep, params),
             api.getRepresentanteClientes(selectedRep),
-            api.getRepresentanteVisitasPorCliente(selectedRep),
+            api.getRepresentanteVisitasPorCliente(selectedRep, params),
         ])
             .then(([vm, vsm, cl, vc]) => {
                 setVendasMes(vm);
@@ -93,7 +96,7 @@ export default function Representantes() {
             })
             .catch(e => console.error(e))
             .finally(() => setLoadingDetail(false));
-    }, [selectedRep]);
+    }, [selectedRep, selectedClienteNome]);
 
     // Carrega comparativo quando há filtro de mês
     useEffect(() => {
@@ -111,12 +114,15 @@ export default function Representantes() {
         setLoadingPeriodo(true);
         const params = selectedPeriodo.type === 'mes' ? { mes: selectedPeriodo.value } : { ano: selectedPeriodo.value };
         api.getRepresentanteClientesPeriodo(selectedRep, params)
-            .then(names => setClientesAtivos(new Set(names.map(n => n.trim().toLowerCase()))))
+            .then(names => setClientesAtivos(new Set(names.map(normalizeClientName))))
             .catch(e => console.error(e))
             .finally(() => setLoadingPeriodo(false));
     }, [selectedPeriodo, selectedRep]);
 
-    useEffect(() => { setSelectedPeriodo(null); }, [selectedRep]);
+    useEffect(() => {
+        setSelectedPeriodo(null);
+        setSelectedClienteNome('');
+    }, [selectedRep]);
 
     const repInfo = representantes.find(r => r.nome === selectedRep);
     const meta = repInfo?.meta ?? 0;
@@ -145,21 +151,62 @@ export default function Representantes() {
         ? selectedPeriodo.type === 'mes' ? formatMonthLabel(selectedPeriodo.value) : selectedPeriodo.value
         : null;
 
+    const filteredClientes = useMemo(() => {
+        if (!selectedPeriodo || loadingPeriodo) return clientes;
+        return clientes.filter(c => clientesAtivos.has(normalizeClientName(c.nome)));
+    }, [clientes, clientesAtivos, loadingPeriodo, selectedPeriodo]);
+
+    const visitasClienteView = useMemo(() => {
+        if (!selectedPeriodo) return visitasCliente;
+        return visitasCliente.filter(v => {
+            if (!v.mes) return false;
+            return selectedPeriodo.type === 'mes'
+                ? v.mes === selectedPeriodo.value
+                : v.mes.startsWith(selectedPeriodo.value);
+        });
+    }, [selectedPeriodo, visitasCliente]);
+
+    const resumo = useMemo(() => {
+        const dadosPeriodo = selectedPeriodo
+            ? combinedMesData.filter(d => selectedPeriodo.type === 'mes' ? d.mes === selectedPeriodo.value : d.mes.startsWith(selectedPeriodo.value))
+            : combinedMesData;
+        const totalVendas = dadosPeriodo.reduce((sum, d) => sum + d.pedido, 0);
+        const custoVisitas = dadosPeriodo.reduce((sum, d) => sum + d.visita, 0);
+        const ativos = clientes.filter(c => c.status.toLowerCase() === 'ativo').length;
+        const inativos = clientes.length - ativos;
+        const clientesBase = selectedClienteNome ? 1 : filteredClientes.length;
+        const ticketMedio = clientesBase > 0 ? totalVendas / clientesBase : 0;
+
+        return { totalVendas, custoVisitas, ativos, inativos, ticketMedio };
+    }, [clientes, combinedMesData, filteredClientes.length, selectedClienteNome, selectedPeriodo]);
+
+    const clearFilters = () => {
+        setSelectedPeriodo(null);
+        setSelectedClienteNome('');
+    };
+
     const handleBarClick = (data: any) => {
         const mes = data?.mes;
         if (!mes) return;
         setSelectedPeriodo(prev => prev?.type === 'mes' && prev.value === mes ? null : { type: 'mes', value: mes });
     };
 
-    const handleLineClick = (_evt: any, payload: any) => {
-        const ano = payload?.payload?.ano;
+    const handleYearSelection = (ano?: string) => {
         if (!ano) return;
         setSelectedPeriodo(prev => prev?.type === 'ano' && prev.value === ano ? null : { type: 'ano', value: ano });
     };
 
+    const handleLineClick = (_evt: any, payload: any) => {
+        handleYearSelection(payload?.payload?.ano);
+    };
+
     const isClienteAtivo = (nome: string): boolean | null => {
         if (!selectedPeriodo) return null;
-        return clientesAtivos.has(nome.trim().toLowerCase());
+        return clientesAtivos.has(normalizeClientName(nome));
+    };
+
+    const handleClienteClick = (nome: string) => {
+        setSelectedClienteNome(prev => normalizeClientName(prev) === normalizeClientName(nome) ? '' : nome);
     };
 
     if (loading) return (
@@ -356,18 +403,60 @@ export default function Representantes() {
         <div className="space-y-6">
             {header}
 
+            <div className="flex flex-wrap items-center gap-2">
+                {(selectedClienteNome || periodoLabel) && (
+                    <button
+                        onClick={clearFilters}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-300 transition-colors hover:border-[#C01717]/40 hover:text-white"
+                    >
+                        <X className="w-3.5 h-3.5" />
+                        Limpar filtros
+                    </button>
+                )}
+                {selectedClienteNome && (
+                    <span className="inline-flex max-w-[420px] items-center gap-2 rounded-lg border border-[#C01717]/30 bg-[#C01717]/15 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-[#f87171]">
+                        <Filter className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="truncate">{selectedClienteNome}</span>
+                    </span>
+                )}
+                {periodoLabel && (
+                    <span className="inline-flex items-center gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-300">
+                        <Calendar className="w-3.5 h-3.5" />
+                        {periodoLabel}
+                    </span>
+                )}
+            </div>
+
             {loadingDetail ? (
                 <div className="flex items-center justify-center h-64">
                     <div className="w-8 h-8 border-2 border-[#C01717] border-t-transparent rounded-full animate-spin" />
                 </div>
             ) : (
                 <>
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                        {[
+                            { label: 'Vendas', value: formatCurrency(resumo.totalVendas), icon: ShoppingCart, tone: 'text-[#f87171]' },
+                            { label: 'Custo Visitas', value: formatCurrency(resumo.custoVisitas), icon: DollarSign, tone: 'text-amber-300' },
+                            { label: 'Ticket / Cliente', value: formatCurrency(resumo.ticketMedio), icon: Target, tone: 'text-sky-300' },
+                            { label: 'Ativos', value: String(resumo.ativos), icon: Activity, tone: 'text-emerald-300' },
+                            { label: 'Inativos', value: String(resumo.inativos), icon: Users, tone: 'text-slate-300' },
+                        ].map(item => (
+                            <div key={item.label} className="rounded-xl border border-white/10 bg-white/[0.035] px-4 py-3 shadow-xl">
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{item.label}</span>
+                                    <item.icon className={`w-4 h-4 ${item.tone}`} />
+                                </div>
+                                <p className="mt-2 truncate text-lg font-black text-white">{item.value}</p>
+                            </div>
+                        ))}
+                    </div>
+
                     {/* Charts */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="card-premium">
                             <div className="flex items-center gap-2 mb-4">
                                 <TrendingUp className="w-4 h-4 text-[#e05050]" />
-                                <h2 className="text-sm font-semibold text-white">Vendas</h2>
+                                <h2 className="text-sm font-semibold text-white">Vendas {selectedClienteNome && <span className="text-slate-500">/ Cliente</span>}</h2>
                             </div>
                             <div className="overflow-x-auto">
                                 <div style={{ minWidth: Math.max(500, combinedMesData.length * 52) }}>
@@ -377,8 +466,16 @@ export default function Representantes() {
                                             <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 9, fontWeight: 600 }} axisLine={false} tickLine={false} />
                                             <YAxis tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} width={44} />
                                             <Tooltip content={<ChartTooltip />} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
-                                            <Bar dataKey="pedido" name="Pedido" fill="#C01717" radius={[3, 3, 0, 0]} onClick={handleBarClick} style={{ cursor: 'pointer' }} />
-                                            <Bar dataKey="visita" name="Visita Técnica" fill="#f97316" radius={[3, 3, 0, 0]} onClick={handleBarClick} style={{ cursor: 'pointer' }} />
+                                            <Bar dataKey="pedido" name="Pedido" fill="#C01717" radius={[3, 3, 0, 0]} onClick={handleBarClick} style={{ cursor: 'pointer' }}>
+                                                {combinedMesData.map(entry => (
+                                                    <Cell key={`pedido-${entry.mes}`} fill={selectedPeriodo?.type === 'mes' && selectedPeriodo.value !== entry.mes ? '#5b1518' : '#C01717'} opacity={selectedPeriodo?.type === 'mes' && selectedPeriodo.value !== entry.mes ? 0.35 : 1} />
+                                                ))}
+                                            </Bar>
+                                            <Bar dataKey="visita" name="Visita Técnica" fill="#f97316" radius={[3, 3, 0, 0]} onClick={handleBarClick} style={{ cursor: 'pointer' }}>
+                                                {combinedMesData.map(entry => (
+                                                    <Cell key={`visita-${entry.mes}`} fill={selectedPeriodo?.type === 'mes' && selectedPeriodo.value !== entry.mes ? '#6b3a10' : '#f97316'} opacity={selectedPeriodo?.type === 'mes' && selectedPeriodo.value !== entry.mes ? 0.3 : 1} />
+                                                ))}
+                                            </Bar>
                                         </BarChart>
                                     </ResponsiveContainer>
                                 </div>
@@ -399,7 +496,7 @@ export default function Representantes() {
                                 <h2 className="text-sm font-semibold text-white">Média de Venda Geral</h2>
                             </div>
                             <ResponsiveContainer width="100%" height={220}>
-                                <LineChart data={mediaAnualData} margin={{ left: 0, right: 16 }} style={{ cursor: 'pointer' }}>
+                                <LineChart data={mediaAnualData} margin={{ left: 0, right: 16 }} style={{ cursor: 'pointer' }} onClick={(state: any) => handleYearSelection(state?.activeLabel)}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
                                     <XAxis dataKey="ano" tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }} axisLine={false} tickLine={false} />
                                     <YAxis tick={{ fill: '#64748b', fontSize: 9 }} axisLine={false} tickLine={false} tickFormatter={v => `R$${(v / 1000).toFixed(0)}k`} width={44} />
@@ -429,13 +526,13 @@ export default function Representantes() {
                                     <div className="ml-auto flex items-center gap-2 bg-[#C01717]/15 border border-[#C01717]/30 rounded-lg px-2.5 py-1">
                                         <Calendar className="w-3 h-3 text-[#e05050]" />
                                         <span className="text-xs font-bold text-[#f87171]">{periodoLabel}</span>
-                                        <span className="text-xs text-slate-400">— {loadingPeriodo ? '...' : clientesAtivos.size} compraram</span>
+                                        <span className="text-xs text-slate-400">— {loadingPeriodo ? '...' : filteredClientes.length} compraram</span>
                                         <button onClick={() => setSelectedPeriodo(null)} className="text-slate-500 hover:text-slate-300 transition-colors ml-1">
                                         <X className="w-3 h-3" />
                                         </button>
                                     </div>
                                 ) : (
-                                    <span className="ml-auto text-[10px] text-slate-600">Clique no gráfico para filtrar</span>
+                                    <span className="ml-auto text-[10px] font-bold uppercase tracking-wider text-slate-600">{clientes.length} na carteira</span>
                                 )}
                             </div>
                             <div className="overflow-auto max-h-[300px]">
@@ -448,26 +545,31 @@ export default function Representantes() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
-                                        {clientes.map((c, i) => {
+                                        {filteredClientes.map((c, i) => {
                                             const ativo = isClienteAtivo(c.nome);
+                                            const selected = normalizeClientName(selectedClienteNome) === normalizeClientName(c.nome);
                                             return (
-                                            <tr key={i} className={`transition-all ${selectedPeriodo ? (ativo ? 'ring-1 ring-emerald-500/30 bg-emerald-500/5' : 'opacity-30') : 'hover:bg-white/5'}`}>
-                                                <td className="py-2.5 pr-4 text-xs truncate max-w-[160px]">
+                                            <tr
+                                                key={i}
+                                                onClick={() => handleClienteClick(c.nome)}
+                                                className={`cursor-pointer transition-all ${selected ? 'bg-[#C01717]/15 ring-1 ring-[#C01717]/30' : selectedPeriodo ? (ativo ? 'bg-emerald-500/5 hover:bg-emerald-500/10' : 'hover:bg-white/5') : 'hover:bg-white/5'}`}
+                                            >
+                                                <td className="py-2.5 pr-4 text-xs truncate max-w-[220px]">
                                                     <div className="flex items-center gap-2">
                                                         {selectedPeriodo && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${ativo ? 'bg-emerald-400' : 'bg-slate-600'}`} />}
-                                                        <span className={ativo === true ? 'text-white font-bold' : 'text-slate-300 font-medium'}>{c.nome}</span>
+                                                        <span className={selected || ativo === true ? 'text-white font-bold' : 'text-slate-300 font-medium'}>{c.nome}</span>
                                                     </div>
                                                 </td>
                                                 <td className="py-2.5 pr-4 text-slate-400 text-xs whitespace-nowrap">{c.ultimaCompra ? formatDate(c.ultimaCompra) : '—'}</td>
                                                 <td className="py-2.5">
                                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${c.status === 'Ativo' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-400 border border-slate-500/20'}`}>
-                                                        {c.status} {c.status === 'Inativo' && c.ultimaCompra ? '(6+ meses)' : ''}
+                                                        {getStatusBadgeLabel({ Status: c.status, ultimaCompra: c.ultimaCompra })}
                                                     </span>
                                                 </td>
                                             </tr>
                                         );
                                         })}
-                                        {clientes.length === 0 && (
+                                        {filteredClientes.length === 0 && (
                                             <tr><td colSpan={3} className="py-8 text-center text-slate-600 text-xs">Nenhum cliente encontrado</td></tr>
                                         )}
                                     </tbody>
@@ -479,6 +581,7 @@ export default function Representantes() {
                             <div className="flex items-center gap-2 mb-4">
                                 <DollarSign className="w-4 h-4 text-[#e05050]" />
                                 <h2 className="text-sm font-semibold text-white">Custo de Visitas por Cliente</h2>
+                                <span className="ml-auto text-[10px] font-bold uppercase tracking-wider text-slate-600">{visitasClienteView.length} registros</span>
                             </div>
                             <div className="overflow-auto max-h-[300px]">
                                 <table className="w-full text-sm">
@@ -490,14 +593,21 @@ export default function Representantes() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
-                                        {visitasCliente.map((v, i) => (
-                                            <tr key={i} className="hover:bg-white/5 transition-colors">
-                                                <td className="py-2.5 pr-4 text-slate-300 font-medium text-xs truncate max-w-[160px]">{v.cliente}</td>
+                                        {visitasClienteView.map((v, i) => {
+                                            const selected = normalizeClientName(selectedClienteNome) === normalizeClientName(v.cliente);
+                                            return (
+                                            <tr
+                                                key={i}
+                                                onClick={() => handleClienteClick(v.cliente)}
+                                                className={`cursor-pointer transition-colors ${selected ? 'bg-[#C01717]/15 ring-1 ring-[#C01717]/30' : 'hover:bg-white/5'}`}
+                                            >
+                                                <td className={`py-2.5 pr-4 font-medium text-xs truncate max-w-[180px] ${selected ? 'text-white' : 'text-slate-300'}`}>{v.cliente}</td>
                                                 <td className="py-2.5 pr-4 text-amber-400 font-bold text-xs whitespace-nowrap">{formatCurrency(v.custo)}</td>
                                                 <td className="py-2.5 text-slate-400 text-xs">{v.mes ? formatMonthLabel(v.mes) : '—'}</td>
                                             </tr>
-                                        ))}
-                                        {visitasCliente.length === 0 && (
+                                        );
+                                        })}
+                                        {visitasClienteView.length === 0 && (
                                             <tr><td colSpan={3} className="py-8 text-center text-slate-600 text-xs">Nenhuma visita registrada</td></tr>
                                         )}
                                     </tbody>

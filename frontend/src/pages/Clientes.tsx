@@ -4,22 +4,7 @@ import { Search, Users, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api, Cliente, ClienteVendasMes, ItensNaoComprados, formatCurrency, formatMonthLabel } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-
-function getStatusBadgeLabel(c: Cliente) {
-    const status = c.Status ?? '';
-    const isActive = status.toLowerCase() === 'ativo';
-    if (isActive) return 'Ativo';
-    
-    if (!c.ultimaCompra) return 'Inativo (Sem compras)';
-    
-    const today = new Date();
-    const lastDate = new Date(`${c.ultimaCompra}T12:00:00Z`);
-    const diffMs = today.getTime() - lastDate.getTime();
-    const diffMonths = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 30.44));
-    
-    if (diffMonths <= 0) return 'Inativo (< 1 mês)';
-    return `Inativo (${diffMonths} ${diffMonths === 1 ? 'mês' : 'meses'})`;
-}
+import { getStatusBadgeLabel } from '../lib/clientStatus';
 
 function ChartTooltipContent({ active, payload, label }: any) {
     if (!active || !payload?.length) return null;
