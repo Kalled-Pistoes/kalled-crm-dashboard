@@ -277,6 +277,9 @@ export default function Vendas() {
         if (historicoVendas.length === 0) return {
             clientes: [],
             forecastTotal: 0,
+            forecastPessimista: 0,
+            forecastMedio: 0,
+            forecastOtimista: 0,
             historicoGrafico: [],
             contatosQuentes: [],
             ultimoMesConsolidadoLabel: '',
