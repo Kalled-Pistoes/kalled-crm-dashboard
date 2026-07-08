@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Users, Download } from 'lucide-react';
+import { CalendarDays, Download, Hash, ReceiptText, Search, Trophy, Users, Wallet } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { api, Cliente, ClienteVendasMes, ItensNaoComprados, formatCurrency, formatMonthLabel } from '../lib/api';
+import { api, Cliente, ClienteResumoPedidos, ClienteVendasMes, ItensNaoComprados, formatCurrency, formatMonthLabel } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import { getStatusBadgeLabel } from '../lib/clientStatus';
 
@@ -110,7 +110,9 @@ export default function Clientes() {
 
     const [activeTab, setActiveTab] = useState<'info' | 'historico' | 'itens'>('info');
     const [clienteVendas, setClienteVendas] = useState<ClienteVendasMes[]>([]);
+    const [clienteResumo, setClienteResumo] = useState<ClienteResumoPedidos | null>(null);
     const [itensData, setItensData] = useState<ItensNaoComprados | null>(null);
+    const [loadingResumo, setLoadingResumo] = useState(false);
     const [loadingVendas, setLoadingVendas] = useState(false);
     const [loadingItens, setLoadingItens] = useState(false);
     const [filtroLinha, setFiltroLinha] = useState('');
@@ -123,8 +125,19 @@ export default function Clientes() {
             setItensData(null);
         }
         setClienteVendas([]);
+        setClienteResumo(null);
         setFiltroLinha('');
         setSearchPN('');
+    }, [selectedCliente?.Cliente]);
+
+    useEffect(() => {
+        const nome = selectedCliente?.Cliente ?? selectedCliente?.['Razão Social'] ?? '';
+        if (!nome) return;
+        setLoadingResumo(true);
+        api.getClienteResumoPedidos(nome)
+            .then(setClienteResumo)
+            .catch(console.error)
+            .finally(() => setLoadingResumo(false));
     }, [selectedCliente?.Cliente]);
 
     const handleTabChange = (tab: 'info' | 'historico' | 'itens') => {
@@ -522,8 +535,9 @@ export default function Clientes() {
                             {/* Tab Content */}
                             <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-4 sm:py-6 relative z-10">
                                 {activeTab === 'info' && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-4">
+                                    <div className="space-y-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-4">
                                             <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider border-b border-white/10 pb-2">Comercial</h3>
                                             <div>
                                                 <p className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Representante</p>
@@ -534,7 +548,7 @@ export default function Clientes() {
                                                 <p className="text-slate-200 text-sm font-medium">{formatDate(selectedCliente.ultimaCompra)}</p>
                                             </div>
                                         </div>
-                                        <div className="space-y-4">
+                                            <div className="space-y-4">
                                             <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider border-b border-white/10 pb-2">Condições de Faturamento</h3>
                                             <div>
                                                 <p className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Desconto Padrão</p>
@@ -547,6 +561,57 @@ export default function Clientes() {
                                             <div>
                                                 <p className="text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wider">Prazo Médio</p>
                                                 <p className="text-slate-200 text-sm font-medium">{selectedCliente.Prazo || 'À vista'}</p>
+                                            </div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2 mb-4">
+                                                <h3 className="text-sm font-bold text-slate-300 uppercase tracking-wider">Resumo de Pedidos</h3>
+                                                {loadingResumo && <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Atualizando...</span>}
+                                            </div>
+
+                                            <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
+                                                {[
+                                                    {
+                                                        label: 'Faturamento Total',
+                                                        value: loadingResumo ? '...' : formatCurrency(clienteResumo?.faturamentoTotal ?? 0),
+                                                        icon: Wallet,
+                                                        tone: 'text-emerald-300',
+                                                    },
+                                                    {
+                                                        label: 'Qtd. Pedidos',
+                                                        value: loadingResumo ? '...' : String(clienteResumo?.totalPedidos ?? 0),
+                                                        icon: Hash,
+                                                        tone: 'text-sky-300',
+                                                    },
+                                                    {
+                                                        label: 'Média / Pedido',
+                                                        value: loadingResumo ? '...' : formatCurrency(clienteResumo?.valorMedioPedido ?? 0),
+                                                        icon: ReceiptText,
+                                                        tone: 'text-[#f87171]',
+                                                    },
+                                                    {
+                                                        label: 'Maior Pedido',
+                                                        value: loadingResumo ? '...' : formatCurrency(clienteResumo?.maiorPedido ?? 0),
+                                                        icon: Trophy,
+                                                        tone: 'text-amber-300',
+                                                    },
+                                                    {
+                                                        label: 'Primeiro Pedido',
+                                                        value: loadingResumo ? '...' : formatDate(clienteResumo?.primeiroPedido || undefined),
+                                                        icon: CalendarDays,
+                                                        tone: 'text-slate-300',
+                                                    },
+                                                ].map(item => (
+                                                    <div key={item.label} className="min-w-0 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <span className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-500">{item.label}</span>
+                                                            <item.icon className={`w-4 h-4 flex-shrink-0 ${item.tone}`} />
+                                                        </div>
+                                                        <p className="mt-2 truncate text-sm font-black text-white">{item.value}</p>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     </div>

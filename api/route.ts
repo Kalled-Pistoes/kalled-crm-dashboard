@@ -522,6 +522,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.json(Object.entries(map).sort(([a], [b]) => a.localeCompare(b)).map(([mes, total]) => ({ mes, total })));
         }
 
+        if (s0 === 'clientes' && s1 && s2 === 'resumo-pedidos') {
+            const user = requireAuth(req, res);
+            if (!user) return;
+            const nome = decodeURIComponent(s1);
+            const { data: cli } = await supabase.from('clientes').select('id').ilike('nome', nome).single();
+            if (!cli) return res.json({
+                totalPedidos: 0,
+                valorMedioPedido: 0,
+                maiorPedido: 0,
+                faturamentoTotal: 0,
+                primeiroPedido: null,
+                ultimoPedido: null,
+            });
+
+            const pedidos = await fetchAllPages(
+                supabase.from('vendas_representantes')
+                    .select('data, valor_pedido')
+                    .eq('cliente_id', cli.id)
+            );
+
+            const valores = pedidos
+                .map((p: any) => Number(p.valor_pedido || 0))
+                .filter((v: number) => v > 0);
+            const datas = pedidos
+                .map((p: any) => String(p.data || ''))
+                .filter(Boolean)
+                .sort();
+            const faturamentoTotal = valores.reduce((sum: number, value: number) => sum + value, 0);
+            const totalPedidos = pedidos.length;
+
+            return res.json({
+                totalPedidos,
+                valorMedioPedido: totalPedidos > 0 ? faturamentoTotal / totalPedidos : 0,
+                maiorPedido: valores.length > 0 ? Math.max(...valores) : 0,
+                faturamentoTotal,
+                primeiroPedido: datas[0] || null,
+                ultimoPedido: datas[datas.length - 1] || null,
+            });
+        }
+
         if (s0 === 'clientes' && s1 && s2 === 'itens-nao-comprados') {
             const user = requireAuth(req, res);
             if (!user) return;

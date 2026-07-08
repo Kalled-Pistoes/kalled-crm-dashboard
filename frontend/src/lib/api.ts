@@ -109,6 +109,15 @@ export interface ClienteVendasMes {
     total: number;
 }
 
+export interface ClienteResumoPedidos {
+    totalPedidos: number;
+    valorMedioPedido: number;
+    maiorPedido: number;
+    faturamentoTotal: number;
+    primeiroPedido: string | null;
+    ultimoPedido: string | null;
+}
+
 export interface ItemNaoComprado {
     pn: string;
     descricao: string;
@@ -218,6 +227,7 @@ export const api = {
         }) as Promise<{ success: boolean }>;
     },
     getClienteVendasPorMes: (nome: string) => fetchJson<ClienteVendasMes[]>(`/api/clientes/${encodeURIComponent(nome)}/vendas-por-mes`),
+    getClienteResumoPedidos: (nome: string) => fetchJson<ClienteResumoPedidos>(`/api/clientes/${encodeURIComponent(nome)}/resumo-pedidos`),
     getClienteItensNaoComprados: (nome: string) => fetchJson<ItensNaoComprados>(`/api/clientes/${encodeURIComponent(nome)}/itens-nao-comprados`),
     getClientesTop: (filters?: Filters) => fetchJson<ClienteTop[]>('/api/clientes/top', filters as any),
     getRepresentantes: () => fetchJson<Representante[]>('/api/representantes'),
