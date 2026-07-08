@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Search, Calendar, TrendingUp, UserCheck, Clock, ArrowRight, Filter, Sparkles, PhoneCall } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Gauge, Search, Calendar, TrendingUp, UserCheck, Clock, ArrowRight, Filter, Sparkles, PhoneCall, SlidersHorizontal } from 'lucide-react';
 import {
     LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
@@ -21,50 +21,61 @@ function diffInMonthsCivil(mes1: string, mes2: string): number {
     return (y1 - y2) * 12 + (m1 - m2);
 }
 
-// Algoritmo matemático para probabilidade de recompra no mês de forecast
-function calcularProbabilidade(c: number, inatividadeMeses: number): { percent: number; label: 'alta' | 'media' | 'baixa' } {
-    // Penalização pesada de Churn se inativo há mais de 6 meses
-    if (inatividadeMeses > 6) {
-        return { percent: Math.max(5, Math.round(15 - (inatividadeMeses - 6) * 1.5)), label: 'baixa' };
+function clamp(value: number, min: number, max: number): number {
+    return Math.min(max, Math.max(min, value));
+}
+
+function median(values: number[]): number {
+    if (values.length === 0) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+function average(values: number[]): number {
+    return values.length > 0 ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+}
+
+function stdDev(values: number[]): number {
+    if (values.length < 2) return 0;
+    const avg = average(values);
+    return Math.sqrt(average(values.map(value => Math.pow(value - avg, 2))));
+}
+
+function calcularProbabilidadeRealista(
+    cicloMeses: number,
+    inatividadeMeses: number,
+    consistenciaCiclo: number,
+    mesesComCompra: number,
+    ticketMedio: number,
+): { percent: number; label: 'alta' | 'media' | 'baixa'; atrasoMeses: number; acao: ClientePredict['acaoRecomendada'] } {
+    if (mesesComCompra === 0) return { percent: 0, label: 'baixa', atrasoMeses: 0, acao: 'observar' };
+
+    if (mesesComCompra === 1 || cicloMeses <= 0) {
+        const base = inatividadeMeses <= 1 ? 42 : inatividadeMeses <= 3 ? 28 : 12;
+        const percent = clamp(Math.round(base + Math.min(ticketMedio / 2500, 12)), 5, 55);
+        return {
+            percent,
+            label: percent >= 45 ? 'media' : 'baixa',
+            atrasoMeses: 0,
+            acao: percent >= 45 ? 'monitorar' : 'observar',
+        };
     }
-    
-    // Compra única (ciclo indefinido)
-    if (c === 0) {
-        if (inatividadeMeses <= 2) {
-            return { percent: 45, label: 'media' };
-        } else if (inatividadeMeses <= 4) {
-            return { percent: 25, label: 'baixa' };
-        } else {
-            return { percent: 10, label: 'baixa' };
-        }
-    }
-    
-    // Cliente recorrente que compra todo mês
-    if (c <= 1.2 && inatividadeMeses === 1) {
-        return { percent: 95, label: 'alta' };
-    }
-    
-    const dif = inatividadeMeses - c;
-    
-    if (Math.abs(dif) < 0.5) {
-        // Exatamente no prazo estimado de recompra
-        return { percent: 88, label: 'alta' };
-    } else if (dif < 0) {
-        // Ainda não atingiu o intervalo do ciclo
-        if (Math.abs(dif) <= 1.1) {
-            return { percent: 55, label: 'media' };
-        }
-        return { percent: 20, label: 'baixa' };
-    } else {
-        // Atrasado em relação ao ciclo
-        if (dif <= 1.1) {
-            return { percent: 72, label: 'alta' }; // Ligeiramente atrasado
-        } else if (dif <= 2.1) {
-            return { percent: 45, label: 'media' }; // Atrasado médio
-        } else {
-            return { percent: 15, label: 'baixa' }; // Churn presumido a curto prazo
-        }
-    }
+
+    const atrasoMeses = inatividadeMeses - cicloMeses;
+    const cicloNormalizado = clamp(cicloMeses, 1, 18);
+    const janelaCompra = 1 / (1 + Math.exp(-(atrasoMeses + 0.35) / Math.max(0.9, cicloNormalizado * 0.28)));
+    const recenciaPenalty = inatividadeMeses > cicloMeses * 2.4 ? Math.min(35, (inatividadeMeses - cicloMeses * 2.4) * 3) : 0;
+    const valorBoost = Math.min(10, Math.log10(Math.max(ticketMedio, 1)) * 2);
+    const percent = clamp(Math.round((janelaCompra * 74) + (consistenciaCiclo * 16) + valorBoost - recenciaPenalty), 5, 96);
+    const label = percent >= 70 ? 'alta' : percent >= 40 ? 'media' : 'baixa';
+
+    let acao: ClientePredict['acaoRecomendada'] = 'observar';
+    if (label === 'alta' && atrasoMeses >= -0.5) acao = 'acionar';
+    else if (label === 'media') acao = 'monitorar';
+    else if (inatividadeMeses >= Math.max(6, cicloMeses * 2)) acao = 'reativar';
+
+    return { percent, label, atrasoMeses, acao };
 }
 
 interface ClientePredict {
@@ -79,6 +90,14 @@ interface ClientePredict {
     probabilidadeLabel: 'alta' | 'media' | 'baixa';
     statusInatividade: 'ativo' | '3m' | '6m' | '9m' | '1a' | '2a+';
     valorForecast: number;
+    atrasoMeses: number;
+    confiancaCiclo: number;
+    ticketMedioPedido: number;
+    mesesComCompra: number;
+    proximaCompraMes: string;
+    acaoRecomendada: 'acionar' | 'monitorar' | 'reativar' | 'observar';
+    prioridadeScore: number;
+    segmentoValor: 'estrategico' | 'recorrente' | 'desenvolver' | 'baixo';
 }
 
 export default function Vendas() {
@@ -114,6 +133,9 @@ export default function Vendas() {
     // Filtros da aba Predict
     const [searchPredict, setSearchPredict] = useState('');
     const [filtroInatividade, setFiltroInatividade] = useState<'all' | 'ativo' | '3m' | '6m' | '9m' | '1a' | '2a+'>('all');
+    const [filtroProbabilidade, setFiltroProbabilidade] = useState<'all' | 'alta' | 'media' | 'baixa'>('all');
+    const [filtroAcao, setFiltroAcao] = useState<'all' | ClientePredict['acaoRecomendada']>('all');
+    const [ordenacaoPredict, setOrdenacaoPredict] = useState<'prioridade' | 'probabilidade' | 'valor' | 'atraso'>('prioridade');
 
     const filters: Filters = {
         ano: searchParams.get('ano') || String(new Date().getFullYear()),
@@ -287,6 +309,13 @@ export default function Vendas() {
             let cicloMedioMeses = 0;
             let inatividadeMeses = 0;
             let ultimaCompraDateBeforeMay = '';
+            let confiancaCiclo = 0;
+            let ticketMedioPedido = 0;
+            let mesesComCompra = 0;
+            let proximaCompraMes = '';
+            let atrasoMeses = 0;
+            let acaoRecomendada: ClientePredict['acaoRecomendada'] = 'observar';
+            let segmentoValor: ClientePredict['segmentoValor'] = 'baixo';
             
             if (comprasHistoricas.length > 0) {
                 totalCompradoConsolidado = comprasHistoricas.reduce((acc, v) => acc + v.valor, 0);
@@ -294,8 +323,11 @@ export default function Vendas() {
                 // Datas civis distintas de compra (YYYY-MM)
                 const mesesAtivosSet = new Set(comprasHistoricas.map(v => v.data.substring(0, 7)));
                 const mesesAtivos = mesesAtivosSet.size;
+                const mesesAtivosSorted = Array.from(mesesAtivosSet).sort();
+                mesesComCompra = mesesAtivos;
                 
                 faturamentoMedioMensal = mesesAtivos > 0 ? (totalCompradoConsolidado / mesesAtivos) : 0;
+                ticketMedioPedido = comprasHistoricas.length > 0 ? totalCompradoConsolidado / comprasHistoricas.length : 0;
                 
                 const datasSorted = comprasHistoricas.map(v => v.data).sort();
                 ultimaCompraDateBeforeMay = datasSorted[datasSorted.length - 1];
@@ -306,14 +338,35 @@ export default function Vendas() {
                 
                 // Ciclo médio em meses civis
                 cicloMedioMeses = mesesAtivos > 0 ? (periodoTotalMeses / mesesAtivos) : 0;
+                const intervalosReais = mesesAtivosSorted
+                    .slice(1)
+                    .map((mes, idx) => diffInMonthsCivil(mes, mesesAtivosSorted[idx]))
+                    .filter(intervalo => intervalo > 0);
+                if (intervalosReais.length > 0) {
+                    const cicloMediano = median(intervalosReais);
+                    const cicloMedia = average(intervalosReais);
+                    cicloMedioMeses = clamp((cicloMediano * 0.65) + (cicloMedia * 0.35), 1, 48);
+                    confiancaCiclo = clamp(1 - (stdDev(intervalosReais) / Math.max(cicloMedia, 1)), 0.15, 0.95);
+                } else {
+                    cicloMedioMeses = 0;
+                    confiancaCiclo = mesesAtivos >= 2 ? 0.35 : 0.2;
+                }
                 
                 // Inatividade em meses civis em relação ao mês de forecast
                 inatividadeMeses = diffInMonthsCivil(mesForecast, ultimaCompraDateBeforeMay.substring(0, 7));
+                proximaCompraMes = cicloMedioMeses > 0 ? addMonths(ultimaCompraDateBeforeMay.substring(0, 7), Math.round(cicloMedioMeses)) : '';
             } else {
                 // Cliente novo que só comprou no mês de forecast
                 faturamentoMedioMensal = faturamentoRealMes;
+                ticketMedioPedido = comprasMesAtualCliente.length > 0 ? faturamentoRealMes / comprasMesAtualCliente.length : 0;
+                mesesComCompra = faturamentoRealMes > 0 ? 1 : 0;
+                confiancaCiclo = 0.15;
                 inatividadeMeses = 0;
             }
+
+            if (faturamentoMedioMensal >= 30000) segmentoValor = 'estrategico';
+            else if (faturamentoMedioMensal >= 8000) segmentoValor = 'recorrente';
+            else if (faturamentoMedioMensal >= 2500) segmentoValor = 'desenvolver';
 
             // Cálculo híbrido de probabilidade e forecast
             let probabilidade = 0;
@@ -330,18 +383,17 @@ export default function Vendas() {
                 valorForecast = faturamentoRealMes;
                 statusInatividade = 'ativo';
                 ultimaCompraDate = comprasMesAtualCliente.map(v => v.data).sort().pop() || '';
+                acaoRecomendada = 'observar';
+                atrasoMeses = 0;
             } else {
                 // Cliente ainda não comprou em Maio de 2026 (projeção baseada em ciclo histórico)
                 ultimaCompraDate = ultimaCompraDateBeforeMay;
-                const probInfo = calcularProbabilidade(cicloMedioMeses, inatividadeMeses);
+                const probInfo = calcularProbabilidadeRealista(cicloMedioMeses, inatividadeMeses, confiancaCiclo, mesesComCompra, ticketMedioPedido);
                 probabilidade = probInfo.percent;
                 probabilidadeLabel = probInfo.label;
-
-                if (probInfo.label === 'alta') {
-                    valorForecast = faturamentoMedioMensal;
-                } else if (probInfo.label === 'media') {
-                    valorForecast = faturamentoMedioMensal * 0.3;
-                }
+                atrasoMeses = probInfo.atrasoMeses;
+                acaoRecomendada = probInfo.acao;
+                valorForecast = faturamentoMedioMensal * (probabilidade / 100) * clamp(0.65 + confiancaCiclo * 0.5, 0.7, 1.12);
 
                 // Classificação de status de inatividade
                 if (inatividadeMeses >= 24) {
@@ -359,6 +411,13 @@ export default function Vendas() {
                 }
             }
 
+            const prioridadeScore = Math.round(
+                (probabilidade * 0.42)
+                + (clamp(faturamentoMedioMensal / 1000, 0, 35) * 0.85)
+                + (clamp(atrasoMeses, 0, 8) * 3)
+                + (confiancaCiclo * 12)
+            );
+
             return {
                 nome,
                 totalComprado: totalCompradoConsolidado + faturamentoRealMes,
@@ -370,7 +429,15 @@ export default function Vendas() {
                 probabilidade,
                 probabilidadeLabel,
                 statusInatividade,
-                valorForecast
+                valorForecast,
+                atrasoMeses,
+                confiancaCiclo,
+                ticketMedioPedido,
+                mesesComCompra,
+                proximaCompraMes,
+                acaoRecomendada,
+                prioridadeScore,
+                segmentoValor
             };
         });
 
@@ -430,8 +497,8 @@ export default function Vendas() {
         // Clientes quentes recomendados para contato (Alta probabilidade e maior faturamento previsto)
         // Filtrar apenas aqueles que ainda NÃO compraram em Maio e têm probabilidade alta
         const contatosQuentes = clientesCalculados
-            .filter(c => c.probabilidadeLabel === 'alta' && c.inatividadeMeses > 0)
-            .sort((a, b) => b.faturamentoMedioMensal - a.faturamentoMedioMensal)
+            .filter(c => c.acaoRecomendada === 'acionar' && c.inatividadeMeses > 0)
+            .sort((a, b) => b.prioridadeScore - a.prioridadeScore)
             .slice(0, 5);
 
         // Frequência média geral dos clientes regulares (com compras recorrentes)
@@ -458,9 +525,33 @@ export default function Vendas() {
         return clientes.filter(c => {
             const matchSearch = !q || c.nome.toLowerCase().includes(q);
             const matchStatus = filtroInatividade === 'all' || c.statusInatividade === filtroInatividade;
-            return matchSearch && matchStatus;
+            const matchProbabilidade = filtroProbabilidade === 'all' || c.probabilidadeLabel === filtroProbabilidade;
+            const matchAcao = filtroAcao === 'all' || c.acaoRecomendada === filtroAcao;
+            return matchSearch && matchStatus && matchProbabilidade && matchAcao;
+        }).sort((a, b) => {
+            if (ordenacaoPredict === 'probabilidade') return b.probabilidade - a.probabilidade;
+            if (ordenacaoPredict === 'valor') return b.faturamentoMedioMensal - a.faturamentoMedioMensal;
+            if (ordenacaoPredict === 'atraso') return b.atrasoMeses - a.atrasoMeses;
+            return b.prioridadeScore - a.prioridadeScore;
         });
-    }, [predictData, searchPredict, filtroInatividade]);
+    }, [predictData, searchPredict, filtroInatividade, filtroProbabilidade, filtroAcao, ordenacaoPredict]);
+
+    const predictResumo = useMemo(() => {
+        const clientes = predictData.clientes;
+        const acionaveis = clientes.filter(c => c.acaoRecomendada === 'acionar');
+        const reativar = clientes.filter(c => c.acaoRecomendada === 'reativar');
+        const pipelinePonderado = clientes.reduce((sum, c) => sum + c.valorForecast, 0);
+        const confiancaMedia = clientes.length > 0
+            ? clientes.reduce((sum, c) => sum + c.confiancaCiclo, 0) / clientes.length
+            : 0;
+
+        return {
+            acionaveis: acionaveis.length,
+            reativar: reativar.length,
+            pipelinePonderado,
+            confiancaMedia,
+        };
+    }, [predictData]);
 
     if (loading) return (
         <div className="flex items-center justify-center h-64">
@@ -815,41 +906,49 @@ export default function Vendas() {
                     <div className="space-y-6 animate-in fade-in duration-200">
                     
                     {/* Seção Superior: KPIs e Gráfico Amplo */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                         {/* Card 1: Faturamento Estimado */}
                         <div className="card-premium py-4 px-5 border-l-4 border-emerald-500 bg-black/45 backdrop-blur-md shadow-2xl">
                             <div className="flex items-center justify-between mb-1.5">
                                 <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Faturamento Estimado ({predictData.mesForecastLabel})</span>
                                 <TrendingUp className="w-4 h-4 text-emerald-400" />
                             </div>
-                            <p className="text-2xl font-black text-emerald-400">{formatCurrency(predictData.forecastTotal)}</p>
-                            <p className="text-xs text-slate-500 mt-1 font-medium">Soma ponderada por probabilidade de recompra.</p>
+                            <p className="text-2xl font-black text-emerald-400">{formatCurrency(predictResumo.pipelinePonderado)}</p>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">Pipeline ponderado por ciclo real e confiança.</p>
                         </div>
 
-                        {/* Card 2: Contatos Quentes */}
+                        {/* Card 2: Ação Imediata */}
                         <div className="card-premium py-4 px-5 border-l-4 border-[#C01717] bg-black/45 backdrop-blur-md shadow-2xl">
                             <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Clientes Quentes (Alta Probabilidade)</span>
-                                <UserCheck className="w-4 h-4 text-[#f87171]" />
+                                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Acionar Agora</span>
+                                <PhoneCall className="w-4 h-4 text-[#f87171]" />
                             </div>
                             <p className="text-2xl font-black text-white">
-                                {predictData.clientes.filter(c => c.probabilidadeLabel === 'alta').length}
+                                {predictResumo.acionaveis}
                             </p>
-                            <p className="text-xs text-slate-500 mt-1 font-medium">Clientes com probabilidade de compra &ge; 70%.</p>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">Clientes no ponto de recompra com valor relevante.</p>
                         </div>
 
-                        {/* Card 3: Frequência Geral */}
+                        {/* Card 3: Reativação */}
+                        <div className="card-premium py-4 px-5 border-l-4 border-rose-500 bg-black/45 backdrop-blur-md shadow-2xl">
+                            <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Reativar Carteira</span>
+                                <AlertTriangle className="w-4 h-4 text-rose-400" />
+                            </div>
+                            <p className="text-2xl font-black text-rose-400">{predictResumo.reativar}</p>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">Clientes fora do ciclo e com risco de perda.</p>
+                        </div>
+
+                        {/* Card 4: Confiança */}
                         <div className="card-premium py-4 px-5 border-l-4 border-amber-500 bg-black/45 backdrop-blur-md shadow-2xl">
                             <div className="flex items-center justify-between mb-1.5">
-                                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Ciclo Médio Geral de Recompra</span>
-                                <Clock className="w-4 h-4 text-amber-400" />
+                                <span className="text-[10px] uppercase tracking-wider text-slate-500 font-bold">Confiança do Ciclo</span>
+                                <Gauge className="w-4 h-4 text-amber-400" />
                             </div>
                             <p className="text-2xl font-black text-amber-400">
-                                {predictData.frequenciaMediaGeral > 0 
-                                    ? `${predictData.frequenciaMediaGeral.toFixed(1)} meses` 
-                                    : 'Sem dados'}
+                                {Math.round(predictResumo.confiancaMedia * 100)}%
                             </p>
-                            <p className="text-xs text-slate-500 mt-1 font-medium">Média ponderada do intervalo entre compras.</p>
+                            <p className="text-xs text-slate-500 mt-1 font-medium">Regularidade média dos ciclos históricos.</p>
                         </div>
                     </div>
 
@@ -993,6 +1092,69 @@ export default function Vendas() {
                                     ))}
                                 </div>
 
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="bg-white/5 border border-white/10 rounded-xl p-1">
+                                        <div className="px-2 pt-1 text-[9px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                                            <Gauge className="w-3 h-3" />
+                                            Probabilidade
+                                        </div>
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {([
+                                                { id: 'all', label: 'Todas' },
+                                                { id: 'alta', label: 'Alta' },
+                                                { id: 'media', label: 'Média' },
+                                                { id: 'baixa', label: 'Baixa' },
+                                            ] as const).map(opt => (
+                                                <button
+                                                    key={opt.id}
+                                                    onClick={() => setFiltroProbabilidade(opt.id)}
+                                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${filtroProbabilidade === opt.id ? 'bg-white/15 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white/5 border border-white/10 rounded-xl p-1">
+                                        <div className="px-2 pt-1 text-[9px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                                            <CheckCircle2 className="w-3 h-3" />
+                                            Ação
+                                        </div>
+                                        <div className="flex flex-wrap gap-1 mt-1">
+                                            {([
+                                                { id: 'all', label: 'Todas' },
+                                                { id: 'acionar', label: 'Acionar' },
+                                                { id: 'monitorar', label: 'Monitorar' },
+                                                { id: 'reativar', label: 'Reativar' },
+                                                { id: 'observar', label: 'Observar' },
+                                            ] as const).map(opt => (
+                                                <button
+                                                    key={opt.id}
+                                                    onClick={() => setFiltroAcao(opt.id)}
+                                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${filtroAcao === opt.id ? 'bg-white/15 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <label className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 flex items-center gap-2">
+                                        <SlidersHorizontal className="w-4 h-4 text-slate-500" />
+                                        <select
+                                            value={ordenacaoPredict}
+                                            onChange={e => setOrdenacaoPredict(e.target.value as typeof ordenacaoPredict)}
+                                            className="w-full bg-transparent text-xs font-bold text-slate-300 focus:outline-none cursor-pointer"
+                                        >
+                                            <option value="prioridade" className="bg-[#111113]">Ordenar: Prioridade</option>
+                                            <option value="probabilidade" className="bg-[#111113]">Ordenar: Probabilidade</option>
+                                            <option value="valor" className="bg-[#111113]">Ordenar: Valor mensal</option>
+                                            <option value="atraso" className="bg-[#111113]">Ordenar: Atraso</option>
+                                        </select>
+                                    </label>
+                                </div>
+
                                 {/* Tabela Premium */}
                                 <div className="overflow-x-auto rounded-xl border border-white/5 bg-white/5">
                                     <table className="w-full text-xs">
@@ -1002,13 +1164,14 @@ export default function Vendas() {
                                                 <th className="text-right text-[10px] font-bold uppercase tracking-wider px-2 py-3">Ciclo Médio</th>
                                                 <th className="text-right text-[10px] font-bold uppercase tracking-wider px-2 py-3">Inatividade</th>
                                                 <th className="text-center text-[10px] font-bold uppercase tracking-wider px-4 py-3">Probabilidade</th>
+                                                <th className="text-center text-[10px] font-bold uppercase tracking-wider px-3 py-3">Ação Sugerida</th>
                                                 <th className="text-right text-[10px] font-bold uppercase tracking-wider px-4 py-3">Ação</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-white/5">
                                             {filteredPredict.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={5} className="px-6 py-12 text-center text-slate-500 font-medium">
+                                                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500 font-medium">
                                                         Nenhum cliente atende a estes filtros de predição.
                                                     </td>
                                                 </tr>
@@ -1020,6 +1183,12 @@ export default function Vendas() {
                                                         if (lbl === 'media') return 'bg-amber-500/10 text-amber-400 border-amber-500/25';
                                                         return 'bg-rose-500/10 text-rose-400 border-rose-500/25';
                                                     };
+                                                    const getActionColor = (acao: ClientePredict['acaoRecomendada']) => {
+                                                        if (acao === 'acionar') return 'bg-[#C01717]/15 text-[#f87171] border-[#C01717]/35';
+                                                        if (acao === 'monitorar') return 'bg-amber-500/10 text-amber-300 border-amber-500/25';
+                                                        if (acao === 'reativar') return 'bg-rose-500/10 text-rose-300 border-rose-500/25';
+                                                        return 'bg-slate-500/10 text-slate-300 border-slate-500/20';
+                                                    };
 
                                                     return (
                                                         <tr key={i} className="hover:bg-white/5 transition-colors group">
@@ -1030,21 +1199,35 @@ export default function Vendas() {
                                                                 <div className="text-[9px] text-slate-500 font-semibold mt-0.5">
                                                                     Última compra: {formatDate(c.ultimaCompraDate)}
                                                                 </div>
+                                                                <div className="text-[9px] text-slate-600 font-semibold mt-0.5">
+                                                                    Score {c.prioridadeScore} · {c.segmentoValor}
+                                                                </div>
                                                             </td>
                                                             <td className="px-2 py-3 text-right text-slate-300 font-medium whitespace-nowrap">
                                                                 {c.cicloMedioMeses > 0 
                                                                     ? `a cada ${c.cicloMedioMeses.toFixed(1)} meses` 
                                                                     : 'Compra única'}
+                                                                <div className="text-[9px] text-slate-600 mt-0.5">
+                                                                    Conf. {Math.round(c.confiancaCiclo * 100)}%
+                                                                </div>
                                                             </td>
                                                             <td className="px-2 py-3 text-right whitespace-nowrap">
                                                                 <span className={`font-bold ${c.inatividadeMeses > c.cicloMedioMeses && c.cicloMedioMeses > 0 ? 'text-rose-400' : 'text-slate-400'}`}>
                                                                     {c.inatividadeMeses === 0 ? 'Ativo' : `${c.inatividadeMeses} ${c.inatividadeMeses === 1 ? 'mês' : 'meses'}`}
                                                                 </span>
+                                                                <div className="text-[9px] text-slate-600 mt-0.5">
+                                                                    {c.proximaCompraMes ? `Prev. ${c.proximaCompraMes}` : 'Sem ciclo'}
+                                                                </div>
                                                             </td>
                                                             <td className="px-4 py-3 text-center whitespace-nowrap">
                                                                 <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getProbColor(c.probabilidadeLabel)}`}>
                                                                     <span className="w-1.5 h-1.5 rounded-full bg-current" />
                                                                     {c.probabilidade}% - {c.probabilidadeLabel}
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-3 py-3 text-center whitespace-nowrap">
+                                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getActionColor(c.acaoRecomendada)}`}>
+                                                                    {c.acaoRecomendada}
                                                                 </span>
                                                             </td>
                                                             <td className="px-4 py-3 text-right whitespace-nowrap">
