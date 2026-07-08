@@ -26,6 +26,7 @@ export interface Filters {
     grupo?: string;
 }
 
+// ... existing interfaces ... (they stay the same)
 export interface DashboardStats {
     totalVendas: number;
     totalClientes: number;
@@ -58,6 +59,7 @@ export interface Cliente {
     representante_id?: string;
     editado_manualmente?: boolean;
     ultimaCompra?: string;
+    status?: string | null;
 }
 
 export interface Representante {

@@ -237,7 +237,7 @@ export default function Clientes() {
     const handleOpenEditModal = () => {
         if (!selectedCliente) return;
         setEditFormData({
-            status: selectedCliente.Status || '',
+            status: selectedCliente.status || '',
             grupo: selectedCliente.Grupo || '',
             desconto: selectedCliente.Desconto || '',
             pagamento: selectedCliente.Pagamento || '',
@@ -658,7 +658,7 @@ export default function Clientes() {
                                                     <div className="flex items-center gap-2 flex-shrink-0">
                                                         <button 
                                                             onClick={exportToTXT}
-                                                            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-750 hover:text-white border border-slate-700/50 hover:border-slate-600 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-300 transition-all cursor-pointer"
+                                                            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-755 hover:text-white border border-slate-700/50 hover:border-slate-600 rounded-lg px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-300 transition-all cursor-pointer"
                                                             title="Exportar como TXT formatado para enviar por WhatsApp ou Email"
                                                         >
                                                             <Download className="w-3.5 h-3.5 text-slate-400" />
@@ -674,7 +674,7 @@ export default function Clientes() {
                                                         </button>
                                                     </div>
                                                 </div>
-                                                
+ 
                                                 {/* List */}
                                                 {(() => {
                                                     const visibles = itensData.naoComprados.filter(item => {
@@ -776,8 +776,9 @@ export default function Clientes() {
                                         value={editFormData.status}
                                         onChange={e => setEditFormData(prev => ({ ...prev, status: e.target.value }))}
                                     >
-                                        <option value="Ativo" className="bg-[#111113]">Ativo</option>
-                                        <option value="Inativo" className="bg-[#111113]">Inativo</option>
+                                        <option value="" className="bg-[#111113]">Automático (Última compra)</option>
+                                        <option value="Ativo" className="bg-[#111113]">Ativo (Forçado)</option>
+                                        <option value="Inativo" className="bg-[#111113]">Inativo (Forçado)</option>
                                     </select>
                                 </div>
                                 <div>

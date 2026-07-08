@@ -47,9 +47,9 @@ export async function getProdutoIdsForLinha(supabase: SupabaseClient, linha: str
     return (data || []).map((p: any) => p.id);
 }
 
-// Busca IDs de clientes de um determinado grupo (status)
+// Busca IDs de clientes de um determinado grupo
 export async function getClienteIdsForGrupo(supabase: SupabaseClient, grupo: string): Promise<string[]> {
-    const { data } = await supabase.from('clientes').select('id').eq('status', grupo);
+    const { data } = await supabase.from('clientes').select('id').eq('grupo', grupo);
     return (data || []).map((c: any) => c.id);
 }
 
